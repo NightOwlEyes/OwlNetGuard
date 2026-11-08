@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.nightowleyes.owlnetguard.service.DraggableBubbleContainer
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootBubbleContainer"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:clipChildren="false"
+    android:clipToPadding="false">
+
+    <!-- 1. Collapsed View: Single Circular Floating Bubble -->
+    <RelativeLayout
+        android:id="@+id/cardCollapsedBubble"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:background="@drawable/bg_floating_bubble"
+        android:clickable="true"
+        android:focusable="false"
+        android:gravity="center"
+        android:elevation="6dp"
+        android:visibility="visible">
+
+        <ImageView
+            android:id="@+id/imgCollapsedOwl"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:src="@drawable/logo_faceted_apex"
+            android:scaleType="fitCenter"
+            android:layout_centerInParent="true"/>
+    </RelativeLayout>
+
+    <!-- 2. Expanded View: Action Bar with N Action Buttons + Dedicated Collapse Button -->
+    <LinearLayout
+        android:id="@+id/panelExpanded"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/bg_quick_ball_panel"
+        android:paddingStart="4dp"
+        android:paddingEnd="6dp"
+        android:paddingTop="3dp"
+        android:paddingBottom="3dp"
+        android:elevation="8dp"
+        android:visibility="gone">
+
+        <!-- Button 1: Cách ly ứng dụng (Owl toggle) -->
+        <RelativeLayout
+            android:id="@+id/btnActionIsolate"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_margin="2dp"
+            android:background="@drawable/bg_floating_bubble"
+            android:clickable="true"
+            android:focusable="false"
+            android:gravity="center"
+            android:elevation="4dp">
+
+            <ImageView
+                android:id="@+id/imgBubbleIcon"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:src="@drawable/logo_faceted_apex"
+                android:scaleType="fitCenter"
+                android:layout_centerInParent="true"/>
+        </RelativeLayout>
+
+        <!-- Button 2: Wi-Fi Toggle -->
+        <RelativeLayout
+            android:id="@+id/btnActionWifi"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="2dp"
+            android:background="@drawable/bg_floating_bubble"
+            android:clickable="true"
+            android:focusable="false"
+            android:gravity="center">
+            <ImageView
+                android:id="@+id/imgActionWifi"
+                android:layout_width="19dp"
+                android:layout_height="19dp"
+                android:src="@drawable/ic_wifi"
+                android:layout_centerInParent="true"/>
+            <ImageView
+                android:id="@+id/slashActionWifi"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/ic_bubble_slash"
+                android:visibility="gone"
+                android:layout_centerInParent="true"/>
+        </RelativeLayout>
+
+        <!-- Button 3: Mobile Data Toggle -->
+        <RelativeLayout
+            android:id="@+id/btnActionData"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="2dp"
+            android:layout_marginEnd="2dp"
+            android:background="@drawable/bg_floating_bubble"
+            android:clickable="true"
+            android:focusable="false"
+            android:gravity="center">
+            <ImageView
+                android:id="@+id/imgActionData"
+                android:layout_width="19dp"
+                android:layout_height="19dp"
+                android:src="@drawable/ic_mobile_data"
+                android:layout_centerInParent="true"/>
+            <ImageView
+                android:id="@+id/slashActionData"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/ic_bubble_slash"
+                android:visibility="gone"
+                android:layout_centerInParent="true"/>
+        </RelativeLayout>
+
+        <!-- Button 4: Airplane Mode Toggle -->
+        <RelativeLayout
+            android:id="@+id/btnActionAirplane"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="2dp"
+            android:layout_marginEnd="2dp"
+            android:background="@drawable/bg_floating_bubble"
+            android:clickable="true"
+            android:focusable="false"
+            android:gravity="center">
+            <ImageView
+                android:id="@+id/imgActionAirplane"
+                android:layout_width="19dp"
+                android:layout_height="19dp"
+                android:src="@drawable/ic_airplane"
+                android:layout_centerInParent="true"/>
+            <ImageView
+                android:id="@+id/slashActionAirplane"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/ic_bubble_slash"
+                android:visibility="gone"
+                android:layout_centerInParent="true"/>
+        </RelativeLayout>
+
+        <!-- Button N+1: Nút Gom Lại (Dedicated Collapse Button) -->
+        <RelativeLayout
+            android:id="@+id/btnActionCollapse"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="2dp"
+            android:layout_marginEnd="2dp"
+            android:background="@drawable/bg_floating_bubble"
+            android:clickable="true"
+            android:focusable="false"
+            android:gravity="center">
+            <ImageView
+                android:id="@+id/imgActionCollapse"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_collapse"
+                android:layout_centerInParent="true"/>
+        </RelativeLayout>
+
+    </LinearLayout>
+
+</com.nightowleyes.owlnetguard.service.DraggableBubbleContainer>

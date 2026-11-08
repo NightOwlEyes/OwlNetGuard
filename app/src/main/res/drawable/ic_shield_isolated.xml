@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="256"
+    android:viewportHeight="256">
+    <!-- Dark Crimson-Abyssal Shield Backing -->
+    <path
+        android:fillColor="#1A050A"
+        android:pathData="M128,12 L222,54 L214,128 L184,196 L128,246 L72,196 L42,128 L34,54 Z" />
+
+    <!-- Top Shield Crown Peak (Crimson-Violet) -->
+    <path
+        android:fillColor="#F43F5E"
+        android:pathData="M128,14 L74,40 L82,52 L128,32 Z" />
+    <path
+        android:fillColor="#E11D48"
+        android:pathData="M128,14 L182,40 L174,52 L128,32 Z" />
+
+    <!-- Top Inner White/Rose Rim Highlight -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M128,32 L82,52 L88,60 L128,42 Z" />
+    <path
+        android:fillColor="#FECDD3"
+        android:pathData="M128,32 L174,52 L168,60 L128,42 Z" />
+
+    <!-- Outer Wing Shield Blades (Left - Crimson Armor) -->
+    <path
+        android:fillColor="#E11D48"
+        android:pathData="M36,56 L68,48 L64,62 L52,66 L56,112 L82,162 L118,224 L128,244 L92,212 L58,158 L42,106 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M52,66 L64,62 L66,70 L58,72 L62,110 L86,158 L118,214 L114,218 L80,162 L56,112 Z" />
+    <path
+        android:fillColor="#BE123C"
+        android:pathData="M44,114 L66,148 L96,204 L72,182 L50,144 Z" />
+
+    <!-- Outer Wing Shield Blades (Right - Crimson Armor) -->
+    <path
+        android:fillColor="#BE123C"
+        android:pathData="M220,56 L188,48 L192,62 L204,66 L200,112 L174,162 L138,224 L128,244 L164,212 L198,158 L214,106 Z" />
+    <path
+        android:fillColor="#FFE4E6"
+        android:pathData="M204,66 L192,62 L190,70 L198,72 L194,110 L170,158 L138,214 L142,218 L176,162 L200,112 Z" />
+    <path
+        android:fillColor="#9F1239"
+        android:pathData="M212,114 L190,148 L160,204 L184,182 L206,144 Z" />
+
+    <!-- Owl Center Forehead Diamond Prism -->
+    <path
+        android:fillColor="#F43F5E"
+        android:pathData="M128,50 L100,60 L114,82 L128,108 Z" />
+    <path
+        android:fillColor="#BE123C"
+        android:pathData="M128,50 L156,60 L142,82 L128,108 Z" />
+    <path
+        android:fillColor="#FDA4AF"
+        android:pathData="M100,60 L114,82 L128,50 Z" />
+    <path
+        android:fillColor="#E11D48"
+        android:pathData="M156,60 L142,82 L128,50 Z" />
+
+    <!-- Sweeping Sharp Owl Ear Horns -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M62,40 L104,68 L122,112 L94,78 Z" />
+    <path
+        android:fillColor="#E11D48"
+        android:pathData="M62,40 L74,74 L108,104 L122,112 L94,78 Z" />
+    <path
+        android:fillColor="#FFE4E6"
+        android:pathData="M194,40 L152,68 L134,112 L162,78 Z" />
+    <path
+        android:fillColor="#BE123C"
+        android:pathData="M194,40 L182,74 L148,104 L134,112 L162,78 Z" />
+
+    <!-- Piercing Faceted Amber/Gold Alert Visor Eyes -->
+    <path
+        android:fillColor="#F59E0B"
+        android:pathData="M82,92 L74,108 L86,126 L102,134 L120,122 L114,114 L94,112 L88,100 Z" />
+    <path
+        android:fillColor="#FDE047"
+        android:pathData="M86,126 L102,134 L120,122 L104,118 L92,114 Z" />
+    <path
+        android:fillColor="#FEF08A"
+        android:pathData="M94,100 L112,110 L106,114 L96,110 Z" />
+
+    <path
+        android:fillColor="#D97706"
+        android:pathData="M174,92 L182,108 L170,126 L154,134 L136,122 L142,114 L162,112 L168,100 Z" />
+    <path
+        android:fillColor="#FDE047"
+        android:pathData="M170,126 L154,134 L136,122 L152,118 L164,114 Z" />
+    <path
+        android:fillColor="#FEF08A"
+        android:pathData="M162,100 L144,110 L150,114 L160,110 Z" />
+
+    <!-- Central Diamond Beak -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M128,118 L120,132 L128,148 Z" />
+    <path
+        android:fillColor="#E11D48"
+        android:pathData="M128,118 L136,132 L128,148 Z" />
+
+    <!-- Faceted Crystal Chest Armor -->
+    <path
+        android:fillColor="#FB7185"
+        android:pathData="M100,148 L128,162 L128,196 L112,172 Z" />
+    <path
+        android:fillColor="#E11D48"
+        android:pathData="M156,148 L128,162 L128,196 L144,172 Z" />
+    <path
+        android:fillColor="#BE123C"
+        android:pathData="M94,146 L112,172 L128,208 L106,186 Z" />
+    <path
+        android:fillColor="#881337"
+        android:pathData="M162,146 L144,172 L128,208 L150,186 Z" />
+
+    <!-- Lower Apex Chevron Tip -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M112,206 L128,218 L128,232 L116,214 Z" />
+    <path
+        android:fillColor="#FECDD3"
+        android:pathData="M144,206 L128,218 L128,232 L140,214 Z" />
+</vector>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="bubble_count_margin_bottom">3dp</dimen>
+    <dimen name="bubble_count_text_size">9.5sp</dimen>
+    <dimen name="bubble_icon_size">24dp</dimen>
+    <dimen name="bubble_icon_top_margin_with_count">7dp</dimen>
+    <dimen name="bubble_margin_right">30dp</dimen>
+    <dimen name="bubble_margin_top">30dp</dimen>
+    <dimen name="bubble_size">50dp</dimen>
+    <dimen name="bubble_step">66dp</dimen>
+    <dimen name="bubble_stroke_width">1.8dp</dimen>
+</resources>
