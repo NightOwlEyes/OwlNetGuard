@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/NightOwlEyes/OwlNetGuard/releases/latest">
-    <img src="https://img.shields.io/badge/Release-v1.0-8A2BE2?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.1" />
+    <img src="https://img.shields.io/badge/Release-v1.1-8A2BE2?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.1" />
   </a>
   <a href="https://github.com/NightOwlEyes/OwlNetGuard/releases/latest">
     <img src="https://img.shields.io/badge/Download-APK-00E5FF?style=for-the-badge&logo=google-play&logoColor=black" alt="Tải về APK" />
