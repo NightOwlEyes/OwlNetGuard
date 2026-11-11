@@ -53,6 +53,8 @@ import com.nightowleyes.owlnetguard.ui.components.SelectedAppsHeaderBar
 import com.nightowleyes.owlnetguard.ui.components.SwipeableSelectedAppItem
 import com.nightowleyes.owlnetguard.ui.dialogs.AppPickerDialog
 import com.nightowleyes.owlnetguard.ui.dialogs.CheckUpdateDialog
+import com.nightowleyes.owlnetguard.ui.dialogs.DonateDialog
+import com.nightowleyes.owlnetguard.ui.dialogs.ExcludedAppsDialog
 import com.nightowleyes.owlnetguard.ui.dialogs.InfoDialogType
 import com.nightowleyes.owlnetguard.ui.dialogs.OpenSourceLicensesDialog
 import com.nightowleyes.owlnetguard.ui.dialogs.PrivacyPolicyDialog
@@ -93,6 +95,8 @@ fun MainScreen(
     var showBubbleData by remember { mutableStateOf(PreferencesManager.isBubbleDataVisible(context)) }
     var showBubbleAirplane by remember { mutableStateOf(PreferencesManager.isBubbleAirplaneVisible(context)) }
     var isAutoUnisolateOnReconnect by remember { mutableStateOf(PreferencesManager.isAutoUnisolateOnReconnect(context)) }
+    var excludedOverlayPackages by remember { mutableStateOf(PreferencesManager.getExcludedOverlayPackages(context)) }
+    var showExcludedAppsDialog by remember { mutableStateOf(false) }
 
     fun refreshPrefsState() {
         isVpnEnabled = PreferencesManager.isVpnEnabled(context)
@@ -110,6 +114,7 @@ fun MainScreen(
         showBubbleData = PreferencesManager.isBubbleDataVisible(context)
         showBubbleAirplane = PreferencesManager.isBubbleAirplaneVisible(context)
         isAutoUnisolateOnReconnect = PreferencesManager.isAutoUnisolateOnReconnect(context)
+        excludedOverlayPackages = PreferencesManager.getExcludedOverlayPackages(context)
     }
 
     LaunchedEffect(stateVersion) {
@@ -184,13 +189,14 @@ fun MainScreen(
     }
 
     // Selected apps in the main list ("Ứng dụng đã chọn")
-    val selectedApps = remember(allApps, bubblePackages, activePackages) {
+    val isAppIsolatedOverall = isVpnEnabled && isBubbleIsolated
+    val selectedApps = remember(allApps, bubblePackages, activePackages, isAppIsolatedOverall) {
         allApps
             .filter { bubblePackages.contains(it.packageName) }
             .map { app ->
                 app.copy(
                     isInBubble = true,
-                    isBlocked = activePackages.contains(app.packageName)
+                    isBlocked = isAppIsolatedOverall && activePackages.contains(app.packageName)
                 )
             }
     }
@@ -223,6 +229,10 @@ fun MainScreen(
                     onSelectDialog = { dialogType ->
                         showInfoMenu = false
                         activeDialog = dialogType
+                    },
+                    onOpenDonate = {
+                        showInfoMenu = false
+                        activeDialog = InfoDialogType.DONATE
                     }
                 )
 
@@ -251,7 +261,6 @@ fun MainScreen(
                     // 2. Second Section: Phím nổi thông minh (HUD) & Cài đặt phụ thuộc
                     FloatingHudSettingsCard(
                         isVpnEnabled = isVpnEnabled,
-                        totalSelectedCount = selectedApps.size,
                         canDrawOverlays = canDrawOverlays,
                         isOverlayEnabled = isBubbleOverlayEnabled,
                         showIsolate = showBubbleIsolate,
@@ -261,6 +270,7 @@ fun MainScreen(
                         isolationMode = isolationMode,
                         hasUsageStatsPermission = hasUsageStatsPermission,
                         isAutoUnisolate = isAutoUnisolateOnReconnect,
+                        excludedAppsCount = excludedOverlayPackages.size,
                         onToggleMasterOverlay = { checked ->
                             if (checked && !Settings.canDrawOverlays(context)) {
                                 try {
@@ -290,6 +300,7 @@ fun MainScreen(
                                 activeDialog = InfoDialogType.USAGE_ACCESS_PROMPT
                             }
                         },
+                        onOpenExcludedAppsDialog = { showExcludedAppsDialog = true },
                         onRequestOverlayPermission = onRequestOverlayPermission,
                         onRequestUsageStatsPermission = {
                             activeDialog = InfoDialogType.USAGE_ACCESS_PROMPT
@@ -334,10 +345,18 @@ fun MainScreen(
                                                 app = app,
                                                 isVpnIsolated = isVpnEnabled && isBubbleIsolated,
                                                 onToggleActive = {
-                                                    PreferencesManager.togglePackageActive(
-                                                        context,
-                                                        app.packageName
-                                                    )
+                                                    if (isolationMode == PreferencesManager.ISOLATION_MODE_FOREGROUND) {
+                                                        Toast.makeText(
+                                                            context,
+                                                            "Chế độ 'Chỉ app đang mở': Ứng dụng sẽ tự động cách ly khi bạn mở ứng dụng đó lên màn hình.",
+                                                            Toast.LENGTH_SHORT
+                                                        ).show()
+                                                    } else {
+                                                        PreferencesManager.togglePackageActive(
+                                                            context,
+                                                            app.packageName
+                                                        )
+                                                    }
                                                 },
                                                 onRemoveFromList = {
                                                     PreferencesManager.removePackageFromBubble(
@@ -413,10 +432,18 @@ fun MainScreen(
                                             app = app,
                                             isVpnIsolated = isVpnEnabled && isBubbleIsolated,
                                             onToggleActive = {
-                                                PreferencesManager.togglePackageActive(
-                                                    context,
-                                                    app.packageName
-                                                )
+                                                if (isolationMode == PreferencesManager.ISOLATION_MODE_FOREGROUND) {
+                                                    Toast.makeText(
+                                                        context,
+                                                        "Chế độ 'Chỉ app đang mở': Ứng dụng sẽ tự động cách ly khi bạn mở ứng dụng đó lên màn hình.",
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+                                                } else {
+                                                    PreferencesManager.togglePackageActive(
+                                                        context,
+                                                        app.packageName
+                                                    )
+                                                }
                                             },
                                             onRemoveFromList = {
                                                 PreferencesManager.removePackageFromBubble(
@@ -449,6 +476,19 @@ fun MainScreen(
                         PreferencesManager.togglePackageInBubble(context, pkg)
                     },
                     onDismiss = { showAppPickerDialog = false }
+                )
+            }
+
+            // Excluded Overlay Apps Dialog ("Ứng dụng ngoại lệ khi mở đè - Cách B")
+            if (showExcludedAppsDialog) {
+                ExcludedAppsDialog(
+                    allApps = allApps,
+                    excludedPackages = excludedOverlayPackages,
+                    onToggleExcludedApp = { pkg ->
+                        PreferencesManager.toggleExcludedOverlayPackage(context, pkg)
+                        excludedOverlayPackages = PreferencesManager.getExcludedOverlayPackages(context)
+                    },
+                    onDismiss = { showExcludedAppsDialog = false }
                 )
             }
 
@@ -494,6 +534,19 @@ fun MainScreen(
                             try {
                                 context.startActivity(
                                     Intent(Intent.ACTION_VIEW, url.toUri())
+                                )
+                            } catch (_: Exception) {
+                            }
+                        }
+                    )
+                }
+                InfoDialogType.DONATE -> {
+                    DonateDialog(
+                        onDismiss = { activeDialog = InfoDialogType.NONE },
+                        onOpenSponsors = {
+                            try {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, MainActivity.GITHUB_SPONSORS_URL.toUri())
                                 )
                             } catch (_: Exception) {
                             }

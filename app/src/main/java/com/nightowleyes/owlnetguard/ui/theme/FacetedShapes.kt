@@ -24,3 +24,17 @@ val FacetedBadgeShape = CutCornerShape(
     bottomEnd = 8.dp,
     bottomStart = 2.dp
 )
+
+val FacetedSwitchTrackShape = CutCornerShape(
+    topStart = 7.dp,
+    topEnd = 2.dp,
+    bottomEnd = 7.dp,
+    bottomStart = 2.dp
+)
+
+val FacetedSwitchThumbShape = CutCornerShape(
+    topStart = 5.dp,
+    topEnd = 1.5.dp,
+    bottomEnd = 5.dp,
+    bottomStart = 1.5.dp
+)

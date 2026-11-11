@@ -9,20 +9,18 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.BitmapFactory
 import android.net.ConnectivityManager
-import android.net.Network
 import android.net.NetworkCapabilities
-import android.net.NetworkRequest
 import android.net.VpnService
 import android.os.Build
-import android.os.Handler
-import android.os.Looper
 import android.os.ParcelFileDescriptor
+import android.system.Os
+import android.system.OsConstants
+import android.system.StructPollfd
 import androidx.core.app.NotificationCompat
 import com.nightowleyes.owlnetguard.R
 import com.nightowleyes.owlnetguard.data.PreferencesManager
 import com.nightowleyes.owlnetguard.receiver.NotificationActionReceiver
 import com.nightowleyes.owlnetguard.ui.MainActivity
-import java.io.FileInputStream
 import kotlin.concurrent.thread
 
 class LocalVpnService : VpnService() {
@@ -31,16 +29,16 @@ class LocalVpnService : VpnService() {
     private var vpnInterface: ParcelFileDescriptor? = null
 
     @Volatile
-    private var isRunning: Boolean = false
+    private var isDrainThreadRunning: Boolean = false
 
     @Volatile
-    private var currentActiveBlockedSet: Set<String> = emptySet()
+    private var lastEstablishedBlocked: Boolean? = null
 
-    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    @Volatile
+    private var lastEstablishedPackages: Set<String> = emptySet()
 
     override fun onCreate() {
         super.onCreate()
-        registerNetworkCallback()
         startOrUpdateForegroundNotification()
     }
 
@@ -48,6 +46,13 @@ class LocalVpnService : VpnService() {
         if (intent?.action == ACTION_STOP_VPN) {
             stopVpnInternal()
             return START_NOT_STICKY
+        }
+
+        if (intent?.action == ACTION_UPDATE_NOTIFICATION) {
+            if (isRunning && shouldRunBackgroundVpn(this)) {
+                startOrUpdateForegroundNotification()
+            }
+            return START_STICKY
         }
 
         if (!shouldRunBackgroundVpn(this)) {
@@ -67,173 +72,193 @@ class LocalVpnService : VpnService() {
             return
         }
 
+        val mode = PreferencesManager.getIsolationMode(this)
         val effectiveBlocked = PreferencesManager.getEffectiveBlockedPackages(this)
             .filterTo(LinkedHashSet()) { it != packageName }
         val allManagedPackages = PreferencesManager.getBubblePackages(this)
             .filterTo(LinkedHashSet()) { it != packageName }
-        currentActiveBlockedSet = effectiveBlocked
+
+        // Determine targetPackages based on isolation mode:
+        // - In Mode All ("Tất cả app đã chọn"): all managed apps remain bound in addAllowedApplication
+        //   so their traffic falls through to physical network when unblocked, or to sinkhole when blocked.
+        // - In Foreground Mode ("Chỉ app đang mở"): ONLY the currently opened app is put into the tunnel.
+        //   When no managed app is open, targetPackages is empty (tunnel closed, direct physical network).
+        //   While using the app, targetPackages stays setOf(fgApp) continuously so toggling isolation
+        //   does not recreate the tunnel or disconnect sockets. Only when completely exiting the app
+        //   ("out hẳn app") is targetPackages cleared back to empty.
+        val targetPackages: Set<String> = if (mode == PreferencesManager.ISOLATION_MODE_FOREGROUND) {
+            val fgTunnelPkg = PreferencesManager.getForegroundTunnelPackage()
+            if (fgTunnelPkg != null && allManagedPackages.contains(fgTunnelPkg)) {
+                setOf(fgTunnelPkg)
+            } else {
+                emptySet()
+            }
+        } else {
+            allManagedPackages.ifEmpty { effectiveBlocked }
+        }
+
+        // isBlocked is true if and only if there are packages actively marked for isolation.
+        val isBlocked = effectiveBlocked.isNotEmpty()
 
         startOrUpdateForegroundNotification()
 
+        if (targetPackages.isEmpty()) {
+            isRunning = false
+            lastEstablishedBlocked = null
+            lastEstablishedPackages = emptySet()
+            try {
+                vpnInterface?.close()
+            } catch (_: Exception) {
+            }
+            vpnInterface = null
+            return
+        }
+
+        // Avoid redundant establish() calls when neither the route state nor the bound app set changed
+        if (vpnInterface != null &&
+            isRunning &&
+            lastEstablishedBlocked == isBlocked &&
+            lastEstablishedPackages == targetPackages
+        ) {
+            return
+        }
+
         try {
+            // Exact GauVPN Builder logic:
             val builder = Builder()
-                .setSession("OwlNetGuard")
+                .setSession("MiniNetworkBlocker")
                 .setMtu(1500)
                 .setBlocking(true)
                 .addAddress("10.215.173.1", 30)
                 .addAddress("fd00:1:fd00:1:fd00:1:fd00:1", 128)
 
-            var addedCount = 0
-            if (effectiveBlocked.isNotEmpty()) {
-                for (pkg in effectiveBlocked) {
-                    try {
-                        builder.addAllowedApplication(pkg)
-                        addedCount++
-                    } catch (_: Exception) {
-                    }
-                }
+            if (isBlocked) {
                 // Route traffic of isolated apps into the silent sinkhole
                 builder.addRoute("0.0.0.0", 1)
                 builder.addRoute("128.0.0.0", 1)
                 builder.addRoute("::", 1)
                 builder.addRoute("8000::", 1)
                 builder.addDnsServer("10.215.173.2")
-            } else {
-                // Standby / Unblocked:
-                // Pre-bind all managed apps into the tunnel without adding sinkhole routes.
-                // Traffic falls through to the underlying network so the apps retain internet
-                // while already registered with the VPN interface, preventing abrupt socket drops.
-                if (allManagedPackages.isNotEmpty()) {
-                    for (pkg in allManagedPackages) {
-                        try {
-                            builder.addAllowedApplication(pkg)
-                            addedCount++
-                        } catch (_: Exception) {
-                        }
-                    }
-                }
-                if (addedCount == 0) {
-                    try {
-                        builder.addAllowedApplication(packageName)
-                    } catch (_: Exception) {
-                    }
-                }
             }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 builder.setMetered(false)
             }
 
+            // Bind current physical network to builder (GauVPN style - never bind VPN to itself):
             try {
-                val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                val cm = getSystemService(CONNECTIVITY_SERVICE) as? ConnectivityManager
                 val activeNet = cm?.activeNetwork
                 if (activeNet != null) {
-                    builder.setUnderlyingNetworks(arrayOf(activeNet))
+                    val caps = cm.getNetworkCapabilities(activeNet)
+                    if (caps != null && !caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) {
+                        builder.setUnderlyingNetworks(arrayOf(activeNet))
+                    }
                 }
             } catch (_: Exception) {
             }
 
-            val oldFd = vpnInterface
-            vpnInterface = builder.establish()
-            try {
-                oldFd?.close()
-            } catch (_: Exception) {
+            var addedCount = 0
+            for (pkg in targetPackages) {
+                try {
+                    builder.addAllowedApplication(pkg)
+                    addedCount++
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
 
-            if (!isRunning) {
-                isRunning = true
-                startSinkholeDrainThread()
+            if (addedCount == 0) {
+                try {
+                    builder.addAllowedApplication(packageName)
+                } catch (_: Exception) {
+                }
+            }
+
+            val oldFd = vpnInterface
+            val newFd = builder.establish()
+            vpnInterface = newFd
+            lastEstablishedBlocked = isBlocked
+            lastEstablishedPackages = LinkedHashSet(targetPackages)
+            isRunning = newFd != null
+
+            if (newFd != null) {
+                ensureDrainThreadStarted()
+            }
+
+            if (oldFd != null) {
+                try {
+                    oldFd.close()
+                } catch (_: Exception) {
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    private fun registerNetworkCallback() {
-        if (networkCallback != null) return
-        try {
-            val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
-            val request = NetworkRequest.Builder()
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                .build()
-            val callback = object : ConnectivityManager.NetworkCallback() {
-                override fun onAvailable(network: Network) {
-                    updateUnderlyingNetwork(network)
-                }
-
-                override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
-                    if (networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
-                        updateUnderlyingNetwork(network)
-                    }
-                }
-
-                override fun onLost(network: Network) {
-                    val active = cm.activeNetwork
-                    updateUnderlyingNetwork(active)
-                }
-            }
-            cm.registerNetworkCallback(request, callback)
-            networkCallback = callback
-        } catch (_: Exception) {
-        }
-    }
-
-    private fun updateUnderlyingNetwork(network: Network?) {
-        try {
-            if (network != null) {
-                setUnderlyingNetworks(arrayOf(network))
-            } else {
-                setUnderlyingNetworks(null)
-            }
-        } catch (_: Exception) {
-        }
-    }
-
-    private fun startSinkholeDrainThread() {
+    private fun ensureDrainThreadStarted() {
+        if (isDrainThreadRunning) return
+        isDrainThreadRunning = true
         thread(start = true, isDaemon = true, name = "VpnSinkholeDrain") {
             val buffer = ByteArray(32767)
-            var currentPfd: ParcelFileDescriptor? = null
-            var inputStream: FileInputStream? = null
+            val pollFd = StructPollfd()
+            val pollFds = arrayOf(pollFd)
 
             while (isRunning) {
                 val pfd = vpnInterface
                 if (pfd == null) {
                     try {
-                        Thread.sleep(100L)
+                        Thread.sleep(80L)
                     } catch (_: InterruptedException) {
                         break
                     }
-                } else if (pfd !== currentPfd || inputStream == null) {
-                    try {
-                        inputStream = FileInputStream(pfd.fileDescriptor)
-                        currentPfd = pfd
-                        if (inputStream.read(buffer) < 0) {
-                            Thread.sleep(50L)
-                        }
-                    } catch (_: Exception) {
-                        currentPfd = pfd
-                        inputStream = null
+                    continue
+                }
+                try {
+                    val fd = pfd.fileDescriptor
+                    if (!fd.valid()) {
                         try {
                             Thread.sleep(50L)
                         } catch (_: InterruptedException) {
                             break
+                        }
+                        continue
+                    }
+                    pollFd.fd = fd
+                    pollFd.events = OsConstants.POLLIN.toShort()
+                    pollFd.revents = 0
+                    val ready = Os.poll(pollFds, 100)
+                    if (!isRunning || vpnInterface !== pfd) continue
+                    if (ready > 0) {
+                        val revents = pollFd.revents.toInt()
+                        if ((revents and (OsConstants.POLLERR or OsConstants.POLLHUP or OsConstants.POLLNVAL)) != 0) {
+                            try {
+                                Thread.sleep(50L)
+                            } catch (_: InterruptedException) {
+                                break
+                            }
+                            continue
+                        }
+                        if ((revents and OsConstants.POLLIN) != 0) {
+                            val bytesRead = Os.read(fd, buffer, 0, buffer.size)
+                            if (bytesRead < 0) {
+                                Thread.sleep(20L)
+                            }
                         }
                     }
-                } else {
+                } catch (_: InterruptedException) {
+                    break
+                } catch (_: Exception) {
+                    if (!isRunning || vpnInterface !== pfd) continue
                     try {
-                        if (inputStream.read(buffer) < 0) {
-                            Thread.sleep(50L)
-                        }
-                    } catch (_: Exception) {
-                        inputStream = null
-                        try {
-                            Thread.sleep(50L)
-                        } catch (_: InterruptedException) {
-                            break
-                        }
+                        Thread.sleep(50L)
+                    } catch (_: InterruptedException) {
+                        break
                     }
                 }
             }
+            isDrainThreadRunning = false
         }
     }
 
@@ -253,8 +278,10 @@ class LocalVpnService : VpnService() {
         }
 
         val isIsolationActive = PreferencesManager.isAppIsolationActive(this)
-        val effectiveCount = currentActiveBlockedSet.size
+        val effectiveCount = PreferencesManager.getEffectiveBlockedPackages(this)
+            .filter { it != packageName }.size
         val mode = PreferencesManager.getIsolationMode(this)
+        val isBubbleEnabled = PreferencesManager.isBubbleOverlayEnabled(this)
 
         val title = when {
             !isIsolationActive -> "VPN Nền đang trực (Đang tạm dừng cách ly)"
@@ -262,11 +289,13 @@ class LocalVpnService : VpnService() {
             else -> "VPN Nền đang trực (Chờ kích hoạt ứng dụng)"
         }
 
-        val subtitle = if (mode == PreferencesManager.ISOLATION_MODE_FOREGROUND) {
-            "Phím nổi: Bật/tắt riêng app đang mở"
+        val modeText = if (mode == PreferencesManager.ISOLATION_MODE_FOREGROUND) {
+            "Cách ly: App đang mở"
         } else {
-            "Phím nổi: Bật/tắt tất cả ứng dụng"
+            "Cách ly: Tất cả app đã chọn"
         }
+        val bubbleText = if (isBubbleEnabled) "Phím nổi: Bật" else "Phím nổi: Tắt"
+        val subtitle = "$modeText • $bubbleText"
 
         val openAppIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -278,13 +307,23 @@ class LocalVpnService : VpnService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val toggleIsolateIntent = Intent(this, NotificationActionReceiver::class.java).apply {
-            action = NotificationActionReceiver.ACTION_TOGGLE_ISOLATE
+        val stopServiceIntent = Intent(this, NotificationActionReceiver::class.java).apply {
+            action = NotificationActionReceiver.ACTION_STOP_SERVICE
         }
-        val toggleIsolatePending = PendingIntent.getBroadcast(
+        val stopServicePending = PendingIntent.getBroadcast(
             this,
             101,
-            toggleIsolateIntent,
+            stopServiceIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val toggleBubbleIntent = Intent(this, NotificationActionReceiver::class.java).apply {
+            action = NotificationActionReceiver.ACTION_TOGGLE_BUBBLE_VISIBILITY
+        }
+        val toggleBubblePending = PendingIntent.getBroadcast(
+            this,
+            102,
+            toggleBubbleIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -306,9 +345,14 @@ class LocalVpnService : VpnService() {
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .addAction(
-                if (isIsolationActive) R.drawable.ic_shield_normal else R.drawable.ic_shield_isolated,
-                if (isIsolationActive) "Tạm dừng cách ly" else "Tiếp tục cách ly",
-                toggleIsolatePending
+                R.drawable.ic_power,
+                "Dừng dịch vụ",
+                stopServicePending
+            )
+            .addAction(
+                if (isBubbleEnabled) R.drawable.ic_bubble_inactive else R.drawable.ic_bubble_active,
+                if (isBubbleEnabled) "Tắt phím nổi" else "Bật phím nổi",
+                toggleBubblePending
             )
             .build()
 
@@ -333,7 +377,8 @@ class LocalVpnService : VpnService() {
     @Synchronized
     private fun stopVpnInternal() {
         isRunning = false
-        currentActiveBlockedSet = emptySet()
+        lastEstablishedBlocked = null
+        lastEstablishedPackages = emptySet()
         try {
             vpnInterface?.close()
         } catch (_: Exception) {
@@ -347,14 +392,6 @@ class LocalVpnService : VpnService() {
     }
 
     override fun onDestroy() {
-        networkCallback?.let {
-            val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-            try {
-                cm?.unregisterNetworkCallback(it)
-            } catch (_: Exception) {
-            }
-            networkCallback = null
-        }
         stopVpnInternal()
         super.onDestroy()
     }
@@ -368,13 +405,30 @@ class LocalVpnService : VpnService() {
     companion object {
         const val ACTION_APPLY_VPN = "com.nightowleyes.owlnetguard.ACTION_APPLY_VPN"
         const val ACTION_STOP_VPN = "com.nightowleyes.owlnetguard.ACTION_STOP_VPN"
+        const val ACTION_UPDATE_NOTIFICATION = "com.nightowleyes.owlnetguard.ACTION_UPDATE_NOTIFICATION"
         private const val NOTIFICATION_ID = 1002
+
+        @Volatile
+        var isRunning: Boolean = false
 
         /**
          * "Cách ly ứng dụng" maintains the Background VPN service.
          */
         fun shouldRunBackgroundVpn(context: Context): Boolean {
             return PreferencesManager.isVpnEnabled(context)
+        }
+
+        fun updateNotification(context: Context) {
+            val appCtx = context.applicationContext
+            if (isRunning) {
+                try {
+                    val intent = Intent(appCtx, LocalVpnService::class.java).apply {
+                        action = ACTION_UPDATE_NOTIFICATION
+                    }
+                    appCtx.startService(intent)
+                } catch (_: Exception) {
+                }
+            }
         }
 
         fun applyOrStop(context: Context): Boolean {
@@ -390,11 +444,7 @@ class LocalVpnService : VpnService() {
                 val intent = Intent(appCtx, LocalVpnService::class.java).apply {
                     action = ACTION_APPLY_VPN
                 }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    appCtx.startForegroundService(intent)
-                } else {
-                    appCtx.startService(intent)
-                }
+                appCtx.startForegroundService(intent)
                 true
             } catch (e: Exception) {
                 e.printStackTrace()

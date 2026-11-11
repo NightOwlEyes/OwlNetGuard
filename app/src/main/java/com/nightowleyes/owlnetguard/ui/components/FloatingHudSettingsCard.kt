@@ -24,8 +24,6 @@ import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -59,7 +57,6 @@ import com.nightowleyes.owlnetguard.ui.theme.TextSecondary
 @Composable
 fun FloatingHudSettingsCard(
     isVpnEnabled: Boolean,
-    totalSelectedCount: Int,
     canDrawOverlays: Boolean,
     isOverlayEnabled: Boolean,
     showIsolate: Boolean,
@@ -69,6 +66,7 @@ fun FloatingHudSettingsCard(
     isolationMode: Int,
     hasUsageStatsPermission: Boolean,
     isAutoUnisolate: Boolean,
+    excludedAppsCount: Int = 0,
     onToggleMasterOverlay: (Boolean) -> Unit,
     onToggleIsolate: (Boolean) -> Unit,
     onToggleWifi: (Boolean) -> Unit,
@@ -76,6 +74,7 @@ fun FloatingHudSettingsCard(
     onToggleAirplane: (Boolean) -> Unit,
     onToggleAutoUnisolate: (Boolean) -> Unit,
     onSelectIsolationMode: (Int) -> Unit,
+    onOpenExcludedAppsDialog: () -> Unit = {},
     onRequestOverlayPermission: () -> Unit,
     onRequestUsageStatsPermission: () -> Unit
 ) {
@@ -91,9 +90,6 @@ fun FloatingHudSettingsCard(
     }
 
     val cardAlpha = if (isVpnEnabled) 1.0f else 0.45f
-    val isAutoUnisolateEligible = isVpnEnabled && (
-        isolationMode == PreferencesManager.ISOLATION_MODE_FOREGROUND || totalSelectedCount <= 1
-    )
 
     Card(
         modifier = Modifier
@@ -152,16 +148,14 @@ fun FloatingHudSettingsCard(
                             fontSize = 11.sp
                         )
                     }
-                    Switch(
+                    FacetedSwitch(
                         checked = isOverlayEnabled && canDrawOverlays && isVpnEnabled,
                         onCheckedChange = { if (isVpnEnabled) onToggleMasterOverlay(it) },
                         enabled = isVpnEnabled,
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = BrandPrimary,
-                            uncheckedThumbColor = TextMuted,
-                            uncheckedTrackColor = SlateSurfaceElevated
-                        )
+                        checkedTrackColor = BrandPrimary,
+                        uncheckedTrackColor = SlateSurfaceElevated,
+                        checkedThumbColor = Color.White,
+                        uncheckedThumbColor = TextMuted
                     )
                 }
 
@@ -187,152 +181,202 @@ fun FloatingHudSettingsCard(
                     color = SlateBorder
                 )
 
-                Text(
-                    text = "Các nút trong phím nổi (chọn nút hiển thị):",
-                    color = TextSecondary,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium
-                )
-                Row(
+                val isHudConfigEnabled = isHudActive
+                val hudConfigAlpha = if (isHudConfigEnabled) 1.0f else 0.42f
+
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 2.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .alpha(hudConfigAlpha)
                 ) {
-                    BubbleConfigCheckbox(
-                        label = "Cách ly",
-                        checked = showIsolate,
-                        enabled = isVpnEnabled,
-                        onCheckedChange = onToggleIsolate
+                    Text(
+                        text = "Các nút trong phím nổi (chọn nút hiển thị):",
+                        color = if (isHudConfigEnabled) TextSecondary else TextMuted,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
                     )
-                    BubbleConfigCheckbox(
-                        label = "Wi-Fi",
-                        checked = showWifi,
-                        enabled = isVpnEnabled,
-                        onCheckedChange = onToggleWifi
-                    )
-                    BubbleConfigCheckbox(
-                        label = "Dữ liệu",
-                        checked = showData,
-                        enabled = isVpnEnabled,
-                        onCheckedChange = onToggleData
-                    )
-                    BubbleConfigCheckbox(
-                        label = "Máy bay",
-                        checked = showAirplane,
-                        enabled = isVpnEnabled,
-                        onCheckedChange = onToggleAirplane
-                    )
-                }
-
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 7.dp),
-                    color = SlateBorder
-                )
-
-                Text(
-                    text = "Khi bấm nút Cách ly trên phím nổi:",
-                    color = TextPrimary,
-                    fontSize = 11.5.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = if (isolationMode == PreferencesManager.ISOLATION_MODE_FOREGROUND) {
-                        "Chỉ cách ly ứng dụng đang mở trên màn hình"
-                    } else {
-                        "Cách ly cho toàn bộ danh sách ứng dụng đã chọn"
-                    },
-                    color = CyberCyanLight,
-                    fontSize = 10.5.sp,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    IsolationModeChip(
-                        modifier = Modifier.weight(1f),
-                        title = "Tất cả app đã chọn",
-                        selected = isolationMode == PreferencesManager.ISOLATION_MODE_ALL,
-                        enabled = isVpnEnabled,
-                        onClick = { onSelectIsolationMode(PreferencesManager.ISOLATION_MODE_ALL) }
-                    )
-                    IsolationModeChip(
-                        modifier = Modifier.weight(1f),
-                        title = "Chỉ app đang mở",
-                        selected = isolationMode == PreferencesManager.ISOLATION_MODE_FOREGROUND,
-                        enabled = isVpnEnabled,
-                        onClick = { onSelectIsolationMode(PreferencesManager.ISOLATION_MODE_FOREGROUND) }
-                    )
-                }
-
-                if (isolationMode == PreferencesManager.ISOLATION_MODE_FOREGROUND && !hasUsageStatsPermission && isVpnEnabled) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Button(
-                        onClick = onRequestUsageStatsPermission,
-                        colors = ButtonDefaults.buttonColors(containerColor = DangerRed),
-                        shape = FacetedBadgeShape,
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            "⚠ Chưa cấp quyền Truy cập dữ liệu sử dụng • Nhấn để cấp",
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 7.dp),
-                    color = SlateBorder
-                )
-
-                // Row: Tự hủy cách ly khi bật lại mạng (với cơ chế tự động làm mờ và khóa khi không đủ điều kiện)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .alpha(if (isAutoUnisolateEligible) 1.0f else 0.42f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(
+                    Row(
                         modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 8.dp)
+                            .fillMaxWidth()
+                            .padding(top = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(
-                            text = "Tự hủy cách ly khi bật lại mạng",
-                            color = TextPrimary,
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Bold
+                        BubbleConfigCheckbox(
+                            label = "Cách ly",
+                            checked = showIsolate,
+                            enabled = isHudConfigEnabled,
+                            onCheckedChange = onToggleIsolate
                         )
-                        Text(
-                            text = when {
-                                !isVpnEnabled ->
-                                    "Cần bật Cách ly ứng dụng để sử dụng tính năng này"
-                                isolationMode == PreferencesManager.ISOLATION_MODE_ALL && totalSelectedCount > 1 ->
-                                    "Không khả dụng khi chọn 'Tất cả app đã chọn' có từ 2 app trở lên"
-                                else ->
-                                    "Tự bỏ cách ly khi bật lại Wi-Fi/Dữ liệu từ HUD (áp dụng khi cách ly app đang mở hoặc danh sách có 1 app)"
-                            },
-                            color = if (isAutoUnisolateEligible) TextSecondary else TextMuted,
-                            fontSize = 10.sp,
-                            lineHeight = 13.sp
+                        BubbleConfigCheckbox(
+                            label = "Wi-Fi",
+                            checked = showWifi,
+                            enabled = isHudConfigEnabled,
+                            onCheckedChange = onToggleWifi
+                        )
+                        BubbleConfigCheckbox(
+                            label = "Dữ liệu",
+                            checked = showData,
+                            enabled = isHudConfigEnabled,
+                            onCheckedChange = onToggleData
+                        )
+                        BubbleConfigCheckbox(
+                            label = "Máy bay",
+                            checked = showAirplane,
+                            enabled = isHudConfigEnabled,
+                            onCheckedChange = onToggleAirplane
                         )
                     }
-                    Switch(
-                        checked = isAutoUnisolate && isAutoUnisolateEligible,
-                        onCheckedChange = { if (isAutoUnisolateEligible) onToggleAutoUnisolate(it) },
-                        enabled = isAutoUnisolateEligible,
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = BrandPrimary,
-                            uncheckedThumbColor = TextMuted,
-                            uncheckedTrackColor = SlateSurfaceElevated
-                        )
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 7.dp),
+                        color = SlateBorder
                     )
+
+                    Text(
+                        text = "Khi bấm nút Cách ly trên phím nổi:",
+                        color = if (isHudConfigEnabled) TextPrimary else TextMuted,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = if (!isHudConfigEnabled) {
+                            "Bật công tắc Phím nổi ở trên để tùy chỉnh các chế độ này"
+                        } else if (isolationMode == PreferencesManager.ISOLATION_MODE_FOREGROUND) {
+                            "Chỉ cách ly ứng dụng đang mở trên màn hình"
+                        } else {
+                            "Cách ly cho toàn bộ danh sách ứng dụng đã chọn"
+                        },
+                        color = if (isHudConfigEnabled) CyberCyanLight else TextMuted,
+                        fontSize = 10.5.sp,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        IsolationModeChip(
+                            modifier = Modifier.weight(1f),
+                            title = "Tất cả app đã chọn",
+                            selected = isolationMode == PreferencesManager.ISOLATION_MODE_ALL,
+                            enabled = isHudConfigEnabled,
+                            onClick = { onSelectIsolationMode(PreferencesManager.ISOLATION_MODE_ALL) }
+                        )
+                        IsolationModeChip(
+                            modifier = Modifier.weight(1f),
+                            title = "Chỉ app đang mở",
+                            selected = isolationMode == PreferencesManager.ISOLATION_MODE_FOREGROUND,
+                            enabled = isHudConfigEnabled,
+                            onClick = { onSelectIsolationMode(PreferencesManager.ISOLATION_MODE_FOREGROUND) }
+                        )
+                    }
+
+                    if (isHudConfigEnabled && isolationMode == PreferencesManager.ISOLATION_MODE_FOREGROUND) {
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // Nút cấu hình Ứng dụng ngoại lệ (Bong bóng chat, ứng dụng nổi - Cách B)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(FacetedBadgeShape)
+                                .background(SlateSurfaceElevated)
+                                .border(1.dp, SlateBorder, FacetedBadgeShape)
+                                .clickable { onOpenExcludedAppsDialog() }
+                                .padding(horizontal = 10.dp, vertical = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Ứng dụng ngoại lệ khi mở đè (Lớp phủ)",
+                                    color = TextPrimary,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Thêm ứng dụng có thể hiển thị đè lên ứng dụng bị cách ly (auto click, messenger,...)",
+                                    color = TextSecondary,
+                                    fontSize = 10.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Box(
+                                modifier = Modifier
+                                    .clip(FacetedBadgeShape)
+                                    .background(BrandPrimary.copy(alpha = 0.25f))
+                                    .border(1.dp, CyberCyan.copy(alpha = 0.5f), FacetedBadgeShape)
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                            ) {
+                                Text(
+                                    text = "$excludedAppsCount app",
+                                    color = CyberCyanLight,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        if (!hasUsageStatsPermission && isVpnEnabled) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Button(
+                                onClick = onRequestUsageStatsPermission,
+                                colors = ButtonDefaults.buttonColors(containerColor = DangerRed),
+                                shape = FacetedBadgeShape,
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    "⚠ Chưa cấp quyền Truy cập dữ liệu sử dụng • Nhấn để cấp",
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 7.dp),
+                        color = SlateBorder
+                    )
+
+                    // Row: Tự hủy cách ly khi bật lại mạng (được làm mờ khi Phím nổi chưa bật)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 8.dp)
+                        ) {
+                            Text(
+                                text = "Tự hủy cách ly khi bật lại mạng",
+                                color = if (isHudConfigEnabled) TextPrimary else TextMuted,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = if (!isHudConfigEnabled) {
+                                    "Cần bật Phím nổi ở trên để sử dụng tính năng này"
+                                } else {
+                                    "Tự động khôi phục mạng cho ứng dụng khi bật lại Wi-Fi hoặc Dữ liệu di động"
+                                },
+                                color = if (isHudConfigEnabled) TextSecondary else TextMuted,
+                                fontSize = 10.sp,
+                                lineHeight = 13.sp
+                            )
+                        }
+                        FacetedSwitch(
+                            checked = isAutoUnisolate && isHudConfigEnabled,
+                            onCheckedChange = { if (isHudConfigEnabled) onToggleAutoUnisolate(it) },
+                            enabled = isHudConfigEnabled,
+                            checkedTrackColor = BrandPrimary,
+                            uncheckedTrackColor = SlateSurfaceElevated,
+                            checkedThumbColor = Color.White,
+                            uncheckedThumbColor = TextMuted
+                        )
+                    }
                 }
             }
         }

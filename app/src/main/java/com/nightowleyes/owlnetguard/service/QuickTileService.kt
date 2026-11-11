@@ -21,7 +21,7 @@ class QuickTileService : TileService() {
     override fun onClick() {
         super.onClick()
         if (VpnService.prepare(this) != null) {
-            openMainActivity(requestVpn = true)
+            openMainActivity()
             return
         }
 
@@ -46,23 +46,28 @@ class QuickTileService : TileService() {
         tile.updateTile()
     }
 
-    @Suppress("DEPRECATION")
-    private fun openMainActivity(requestVpn: Boolean = false) {
+
+
+    private fun openMainActivity() {
         val intent = Intent(this, MainActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            if (requestVpn) {
-                putExtra(MainActivity.EXTRA_REQUEST_VPN_PERMISSION, true)
-            }
+            addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP
+            )
+            putExtra(MainActivity.EXTRA_REQUEST_VPN_PERMISSION, true)
         }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             val pendingIntent = PendingIntent.getActivity(
                 this,
                 300,
                 intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                PendingIntent.FLAG_UPDATE_CURRENT or
+                        PendingIntent.FLAG_IMMUTABLE
             )
             startActivityAndCollapse(pendingIntent)
         } else {
+            @Suppress("DEPRECATION")
             startActivityAndCollapse(intent)
         }
     }

@@ -33,8 +33,6 @@ private val DarkColorScheme = darkColorScheme(
     onError = TextPrimary
 )
 
-private val LightColorScheme = DarkColorScheme // Always preserve high-contrast dark utility theme for network tools
-
 @Composable
 fun OwlNetGuardTheme(
     @Suppress("UNUSED_PARAMETER") darkTheme: Boolean = isSystemInDarkTheme(),

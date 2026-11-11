@@ -60,7 +60,7 @@ fun SelectedAppsHeaderBar(
             )
             if (selectedCount > 0) {
                 Text(
-                    text = "Đang kích hoạt: $activeCount • Vuốt ngang để xóa",
+                    text = "Đang cách ly: $activeCount • Vuốt ngang để xóa",
                     color = TextMuted,
                     fontSize = 10.5.sp,
                     maxLines = 1,

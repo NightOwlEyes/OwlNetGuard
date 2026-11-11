@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -144,15 +142,13 @@ fun IsolationMasterCard(
                             )
                         }
                     }
-                    Switch(
+                    FacetedSwitch(
                         checked = isVpnEnabled,
                         onCheckedChange = onToggleVpn,
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = accentColor,
-                            uncheckedThumbColor = TextMuted,
-                            uncheckedTrackColor = SlateSurfaceElevated
-                        )
+                        checkedTrackColor = accentColor,
+                        uncheckedTrackColor = SlateSurfaceElevated,
+                        checkedThumbColor = Color.White,
+                        uncheckedThumbColor = TextMuted
                     )
                 }
             }

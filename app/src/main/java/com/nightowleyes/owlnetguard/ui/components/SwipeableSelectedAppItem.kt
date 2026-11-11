@@ -20,11 +20,15 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxState
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -34,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,24 +70,45 @@ fun SwipeableSelectedAppItem(
     onToggleActive: () -> Unit,
     onRemoveFromList: () -> Unit
 ) {
+    var itemWidthPx by remember { mutableFloatStateOf(0f) }
+    var dismissStateRef: SwipeToDismissBoxState? = null
+
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             if (value == SwipeToDismissBoxValue.StartToEnd ||
                 value == SwipeToDismissBoxValue.EndToStart
             ) {
-                onRemoveFromList()
-                true
+                val currentOffset = dismissStateRef?.let {
+                    try {
+                        kotlin.math.abs(it.requireOffset())
+                    } catch (_: Exception) {
+                        0f
+                    }
+                } ?: 0f
+                // Bắt buộc hành trình vuốt phải thực sự vượt qua 60% chiều rộng thì mới xóa.
+                // Nếu vuốt nhanh (fling) nhưng mới đi được < 60% thì chặn lại và đàn hồi về chỗ cũ.
+                val minThreshold = if (itemWidthPx > 0f) itemWidthPx * 0.50f else Float.MAX_VALUE
+                if (currentOffset >= minThreshold) {
+                    onRemoveFromList()
+                    true
+                } else {
+                    false
+                }
             } else {
                 false
             }
         },
-        positionalThreshold = { totalDistance -> totalDistance * 0.60f } // Chỉ khi vuốt trên 60% mới kích hoạt xóa
+        positionalThreshold = { totalDistance -> totalDistance * 0.50f }
     )
+    dismissStateRef = dismissState
 
     SwipeToDismissBox(
         state = dismissState,
         enableDismissFromStartToEnd = true,
         enableDismissFromEndToStart = true,
+        modifier = Modifier.onSizeChanged { size ->
+            if (size.width > 0) itemWidthPx = size.width.toFloat()
+        },
         backgroundContent = {
             val isSwiping = dismissState.targetValue != SwipeToDismissBoxValue.Settled
             Box(
@@ -93,7 +119,7 @@ fun SwipeableSelectedAppItem(
                     .background(if (isSwiping) DangerRed.copy(alpha = 0.28f) else Color.Transparent)
                     .border(
                         1.dp,
-                        if (isSwiping) DangerRed.copy(alpha = 0.6f) else Color.Transparent,
+                        if (isSwiping) DangerRed.copy(alpha = 0.5f) else Color.Transparent,
                         FacetedTileShape
                     )
                     .padding(horizontal = 18.dp),
@@ -128,20 +154,16 @@ fun SelectedAppRowCard(
     isVpnIsolated: Boolean,
     onToggleActive: () -> Unit
 ) {
-    val isActive = app.isBlocked // true = hexagon active; false = grayed out (paused)
+    val isIsolated = app.isBlocked // true = ĐANG CÁCH LY; false = ĐANG TẠM DỪNG
     val iconBitmap = remember(app.packageName, app.icon) {
         app.icon?.toImageBitmap(width = 112, height = 112)
     }
 
-    val grayscaleColorFilter = remember {
-        ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) })
-    }
-
-    val cardBorderBrush = remember(isActive, isVpnIsolated) {
-        when {
-            !isActive -> SolidColor(SlateBorder.copy(alpha = 0.55f))
-            isVpnIsolated -> Brush.horizontalGradient(listOf(DangerRed, BrandPrimaryDeep))
-            else -> Brush.horizontalGradient(listOf(BrandPrimary.copy(alpha = 0.8f), CyberCyan.copy(alpha = 0.55f)))
+    val cardBorderBrush = remember(isIsolated) {
+        if (isIsolated) {
+            Brush.horizontalGradient(listOf(DangerRed, BrandPrimaryDeep))
+        } else {
+            Brush.horizontalGradient(listOf(BrandPrimary.copy(alpha = 0.8f), CyberCyan.copy(alpha = 0.55f)))
         }
     }
 
@@ -153,26 +175,21 @@ fun SelectedAppRowCard(
             .clickable { onToggleActive() },
         shape = FacetedTileShape,
         colors = CardDefaults.cardColors(
-            containerColor = when {
-                !isActive -> SlateSurface.copy(alpha = 0.55f)
-                isVpnIsolated -> DangerRedMuted.copy(alpha = 0.45f)
-                else -> SlateSurface
-            }
+            containerColor = if (isIsolated) DangerRedMuted.copy(alpha = 0.45f) else SlateSurface
         ),
         border = CardDefaults.outlinedCardBorder().copy(brush = cardBorderBrush)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 9.dp)
-                .alpha(if (isActive) 1f else 0.52f),
+                .padding(horizontal = 12.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (iconBitmap != null) {
                 Image(
                     bitmap = iconBitmap,
                     contentDescription = app.name,
-                    colorFilter = if (isActive) null else grayscaleColorFilter,
+                    colorFilter = null, // Giữ nguyên màu sắc ứng dụng, không làm xám
                     modifier = Modifier
                         .size(42.dp)
                         .clip(RoundedCornerShape(10.dp))
@@ -182,13 +199,13 @@ fun SelectedAppRowCard(
                     modifier = Modifier
                         .size(42.dp)
                         .clip(FacetedBadgeShape)
-                        .background(if (isActive) BrandPrimary.copy(alpha = 0.2f) else SlateSurfaceElevated),
+                        .background(if (isIsolated) DangerRedMuted else BrandPrimary.copy(alpha = 0.2f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = app.name.take(1).uppercase(),
                         fontWeight = FontWeight.Bold,
-                        color = if (isActive) BrandPrimaryLight else TextMuted,
+                        color = if (isIsolated) DangerRed else BrandPrimaryLight,
                         fontSize = 17.sp
                     )
                 }
@@ -202,7 +219,7 @@ fun SelectedAppRowCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = app.name,
-                        color = if (isActive) TextPrimary else TextMuted,
+                        color = TextPrimary,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
@@ -213,26 +230,12 @@ fun SelectedAppRowCard(
                     Box(
                         modifier = Modifier
                             .clip(FacetedBadgeShape)
-                            .background(
-                                when {
-                                    !isActive -> SlateSurfaceElevated
-                                    isVpnIsolated -> DangerRedMuted
-                                    else -> BrandPrimary.copy(alpha = 0.2f)
-                                }
-                            )
+                            .background(if (isIsolated) DangerRedMuted else BrandPrimary.copy(alpha = 0.2f))
                             .padding(horizontal = 6.dp, vertical = 1.5.dp)
                     ) {
                         Text(
-                            text = when {
-                                !isActive -> "TẠM NGƯNG"
-                                isVpnIsolated -> "ĐANG CÁCH LY"
-                                else -> "ĐÃ KÍCH HOẠT"
-                            },
-                            color = when {
-                                !isActive -> TextMuted
-                                isVpnIsolated -> DangerRed
-                                else -> CyberCyanLight
-                            },
+                            text = if (isIsolated) "ĐANG CÁCH LY" else "ĐANG TẠM DỪNG",
+                            color = if (isIsolated) DangerRed else CyberCyanLight,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.ExtraBold
                         )
@@ -247,16 +250,16 @@ fun SelectedAppRowCard(
                 )
             }
 
-            // Hexagonal Prism Button (Previously used for adding to bubble; now toggles Active/Paused isolation state)
+            // Nút lăng kính lục giác: chuyển đổi giữa Đang cách ly và Đang tạm dừng
             IconButton(
                 onClick = onToggleActive,
                 modifier = Modifier.size(40.dp)
             ) {
                 Icon(
                     painter = painterResource(
-                        id = if (isActive) R.drawable.ic_bubble_active else R.drawable.ic_bubble_inactive
+                        id = if (isIsolated) R.drawable.ic_bubble_active else R.drawable.ic_bubble_inactive
                     ),
-                    contentDescription = if (isActive) "Tạm ngưng cách ly ứng dụng này" else "Kích hoạt cách ly ứng dụng này",
+                    contentDescription = if (isIsolated) "Chuyển sang Đang tạm dừng" else "Chuyển sang Đang cách ly",
                     tint = Color.Unspecified,
                     modifier = Modifier.size(28.dp)
                 )

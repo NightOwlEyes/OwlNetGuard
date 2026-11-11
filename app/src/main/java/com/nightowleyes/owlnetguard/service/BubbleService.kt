@@ -2,16 +2,12 @@ package com.nightowleyes.owlnetguard.service
 
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
-import android.app.Notification
-import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.ServiceInfo
 import android.content.res.Configuration
 import android.graphics.PixelFormat
 import android.net.ConnectivityManager
@@ -27,13 +23,9 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.TextView
 import android.widget.Toast
-import androidx.core.app.NotificationCompat
 import com.nightowleyes.owlnetguard.R
 import com.nightowleyes.owlnetguard.data.PreferencesManager
-import com.nightowleyes.owlnetguard.receiver.NotificationActionReceiver
-import com.nightowleyes.owlnetguard.ui.MainActivity
 import com.nightowleyes.owlnetguard.utils.ForegroundAppDetector
 import com.nightowleyes.owlnetguard.utils.NetworkSettingsHelper
 import com.nightowleyes.owlnetguard.utils.NetworkStatus
@@ -91,6 +83,8 @@ class BubbleService : Service() {
     private var imgActionCollapse: ImageView? = null
 
     private var windowParams: WindowManager.LayoutParams? = null
+    private var initialDragParamsX = 0
+    private var initialDragParamsY = 0
     private var isAdded: Boolean = false
     private var isDockedRight: Boolean = true
     private var isExpanded: Boolean = false
@@ -104,6 +98,11 @@ class BubbleService : Service() {
     // Only triggers when ALL networks (both Wi-Fi and Mobile Data) were completely off, then turned back on
     private var wasFullyOffline: Boolean = false
     private var hudLastActiveApp: String? = null
+    private var hudPausedByUserSessionApp: String? = null
+
+    // Double-tap confirmation to cancel/pause isolation ("Hủy cách ly")
+    private var lastUnisolateConfirmTimestamp: Long = 0L
+    private var lastUnisolateConfirmPackage: String? = null
 
     private fun isAllNetworkOff(net: NetworkStatus): Boolean {
         val isAirplane = net.isAirplaneModeOn
@@ -140,13 +139,48 @@ class BubbleService : Service() {
                     updateNetworkViews(net)
                     checkNetworkReconnect(net)
 
-                    // Track foreground user app for HUD reconnection target
+                    val mode = PreferencesManager.getIsolationMode(this@BubbleService)
+                    val bubblePackages = PreferencesManager.getBubblePackages(this@BubbleService)
                     val activeApps = PreferencesManager.getActivePackages(this@BubbleService)
-                    if (activeApps.isNotEmpty()) {
-                        val currentFg = ForegroundAppDetector.getForegroundPackage(this@BubbleService)
-                        if (currentFg != null && !ForegroundAppDetector.isSystemOrSettingsOrLauncher(this@BubbleService, currentFg)) {
-                            if (activeApps.contains(currentFg)) {
-                                hudLastActiveApp = currentFg
+
+                    if (mode == PreferencesManager.ISOLATION_MODE_FOREGROUND) {
+                        val fg = ForegroundAppDetector.getForegroundPackage(this@BubbleService)
+                        val isTransientOrExcluded = ForegroundAppDetector.isTransientOverlayOrSystemOrExcluded(this@BubbleService, fg)
+
+                        if (!isTransientOrExcluded) {
+                            val isLauncher = ForegroundAppDetector.isHomeLauncher(this@BubbleService, fg)
+                            if (isLauncher) {
+                                // User returned to Home screen -> OUT HẲN APP!
+                                hudPausedByUserSessionApp = null
+                                hudLastActiveApp = null
+                                PreferencesManager.setForegroundTunnelPackage(this@BubbleService, null)
+                            } else if (fg != null && bubblePackages.contains(fg)) {
+                                // User opened a managed app in foreground!
+                                if (fg != hudLastActiveApp) {
+                                    // A new app session started!
+                                    hudPausedByUserSessionApp = null
+                                    hudLastActiveApp = fg
+                                    PreferencesManager.setForegroundTunnelPackage(this@BubbleService, fg)
+                                } else {
+                                    if (!activeApps.contains(fg) && fg != hudPausedByUserSessionApp) {
+                                        PreferencesManager.setActiveForegroundApp(this@BubbleService, fg)
+                                    }
+                                }
+                            } else {
+                                // User opened an unmanaged app (or OwlNetGuard) -> OUT HẲN APP!
+                                hudPausedByUserSessionApp = null
+                                hudLastActiveApp = null
+                                PreferencesManager.setForegroundTunnelPackage(this@BubbleService, null)
+                            }
+                        }
+                    } else {
+                        // Mode All: Track foreground user app for HUD reconnection target
+                        if (activeApps.isNotEmpty()) {
+                            val currentFg = ForegroundAppDetector.getForegroundPackage(this@BubbleService)
+                            if (currentFg != null && !ForegroundAppDetector.isSystemOrSettingsOrLauncher(this@BubbleService, currentFg)) {
+                                if (activeApps.contains(currentFg)) {
+                                    hudLastActiveApp = currentFg
+                                }
                             }
                         }
                     }
@@ -160,7 +194,7 @@ class BubbleService : Service() {
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
-                handler.postDelayed(this, 500L)
+                handler.postDelayed(this, 250L)
             }
         }
     }
@@ -170,9 +204,12 @@ class BubbleService : Service() {
     override fun onCreate() {
         super.onCreate()
         NetworkSettingsHelper.init(this)
-        startForegroundWithNotification()
         try {
-            windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            (getSystemService(NOTIFICATION_SERVICE) as? NotificationManager)?.cancel(1001)
+        } catch (_: Exception) {
+        }
+        try {
+            windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
             setupQuickBall()
             updateQuickBallState()
 
@@ -186,7 +223,7 @@ class BubbleService : Service() {
                     addAction(ConnectivityManager.CONNECTIVITY_ACTION)
                 }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    registerReceiver(networkChangeReceiver, filter, Context.RECEIVER_EXPORTED)
+                    registerReceiver(networkChangeReceiver, filter, RECEIVER_EXPORTED)
                 } else {
                     registerReceiver(networkChangeReceiver, filter)
                 }
@@ -223,11 +260,9 @@ class BubbleService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (!shouldShowBubble(this)) {
             removeQuickBall()
-            stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             return START_NOT_STICKY
         }
-        startForegroundWithNotification()
         updateQuickBallState()
         handler.removeCallbacks(foregroundStateWatcher)
         handler.post(foregroundStateWatcher)
@@ -329,17 +364,14 @@ class BubbleService : Service() {
         isDockedRight = true
         isExpanded = false
 
-        var initialParamsX = 0
-        var initialParamsY = 0
-
         // Unified Drag Listener: Allows smooth dragging from ANYWHERE on the HUD (background or buttons)
         view.dragListener = object : DraggableBubbleContainer.DragListener {
             override fun onDragStart(rawX: Float, rawY: Float) {
                 handler.removeCallbacks(idleFadeRunnable)
                 rootContainer?.animate()?.alpha(1.0f)?.setDuration(100L)?.start()
                 val p = windowParams ?: return
-                initialParamsX = p.x
-                initialParamsY = p.y
+                initialDragParamsX = p.x
+                initialDragParamsY = p.y
             }
 
             override fun onDragMove(dx: Float, dy: Float) {
@@ -350,8 +382,8 @@ class BubbleService : Service() {
                 val maxX = (metrics.widthPixels - w).coerceAtLeast(0)
                 val maxY = (metrics.heightPixels - h).coerceAtLeast(0)
 
-                p.x = (initialParamsX + dx).toInt().coerceIn(0, maxX)
-                p.y = (initialParamsY + dy).toInt().coerceIn(0, maxY)
+                p.x = (initialDragParamsX + dx).toInt().coerceIn(0, maxX)
+                p.y = (initialDragParamsY + dy).toInt().coerceIn(0, maxY)
                 updateWindowViewLayout()
             }
 
@@ -396,6 +428,8 @@ class BubbleService : Service() {
     }
 
     private fun collapseBubble() {
+        lastUnisolateConfirmTimestamp = 0L
+        lastUnisolateConfirmPackage = null
         isExpanded = false
         panelExpanded?.visibility = View.GONE
         cardCollapsedBubble?.visibility = View.VISIBLE
@@ -462,55 +496,106 @@ class BubbleService : Service() {
                 val activeApps = PreferencesManager.getActivePackages(this)
 
                 if (mode == PreferencesManager.ISOLATION_MODE_FOREGROUND) {
-                    val fg = ForegroundAppDetector.getForegroundPackage(this)
-                    if (fg != null && bubblePackages.contains(fg)) {
-                        val appLabel = try {
-                            val appInfo = packageManager.getApplicationInfo(fg, 0)
-                            packageManager.getApplicationLabel(appInfo).toString()
-                        } catch (_: Exception) {
-                            fg
+                    if (!ForegroundAppDetector.hasUsageStatsPermission(this)) {
+                        Toast.makeText(
+                            this,
+                            "Vui lòng cấp quyền 'Truy cập dữ liệu sử dụng' cho OwlNetGuard!",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        ForegroundAppDetector.openUsageAccessSettings(this)
+                        return
+                    }
+
+                    val targetPkg = PreferencesManager.getForegroundTunnelPackage()
+
+                    if (targetPkg != null) {
+                        val isCurrentlyIsolated = activeApps.contains(targetPkg)
+                        if (isCurrentlyIsolated) {
+                            // Người dùng muốn HỦY/TẠM DỪNG cách ly:
+                            // Bắt buộc nhấn 2 lần trong vòng 2.5s để xác nhận, tránh bấm nhầm khi cạnh nút mạng
+                            val now = System.currentTimeMillis()
+                            if (now - lastUnisolateConfirmTimestamp > 2500L || lastUnisolateConfirmPackage != targetPkg) {
+                                lastUnisolateConfirmTimestamp = now
+                                lastUnisolateConfirmPackage = targetPkg
+                                Toast.makeText(
+                                    this,
+                                    "Nhấn thêm lần nữa để tạm dừng cách ly",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                return
+                            }
+                            // Đã nhấn lần 2 xác nhận -> hoàn tất
+                            lastUnisolateConfirmTimestamp = 0L
+                            lastUnisolateConfirmPackage = null
+                        } else {
+                            // Kích hoạt cách ly lại không cần xác nhận
+                            lastUnisolateConfirmTimestamp = 0L
+                            lastUnisolateConfirmPackage = null
                         }
 
-                        val nowActive = PreferencesManager.togglePackageActive(this, fg)
-                        val activeCount = PreferencesManager.getActivePackages(this).size
+                        val appLabel = try {
+                            val appInfo = packageManager.getApplicationInfo(targetPkg, 0)
+                            packageManager.getApplicationLabel(appInfo).toString()
+                        } catch (_: Exception) {
+                            targetPkg
+                        }
+
+                        val nowActive = PreferencesManager.togglePackageActive(this, targetPkg)
+                        if (!nowActive) {
+                            hudPausedByUserSessionApp = targetPkg
+                        } else {
+                            hudPausedByUserSessionApp = null
+                        }
+
                         val msg = if (nowActive) {
-                            "Đã bật cách ly mạng: $appLabel"
+                            "Đã ngắt mạng: $appLabel"
                         } else {
-                            "Đã mở lại mạng cho $appLabel ($activeCount ứng dụng khác vẫn được cách ly)"
+                            "Đã mở lại mạng cho $appLabel"
                         }
                         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+                        updateQuickBallState()
                     } else {
-                        // On Launcher, inside OwlNetGuard, or other unmanaged app:
-                        // Toggle overall active state
-                        if (activeApps.isEmpty() && bubblePackages.isEmpty()) {
-                            Toast.makeText(
-                                this,
-                                "Chưa có ứng dụng nào được kích hoạt trong danh sách!",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                            return
-                        }
-                        val isolated = PreferencesManager.toggleAppIsolationActive(this)
-                        val msg = if (isolated) {
-                            "Đang cách ly mạng ${activeApps.size} ứng dụng đã chọn"
-                        } else {
-                            "Đã tạm dừng cách ly tất cả ứng dụng"
-                        }
-                        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+                        // User is NOT currently inside an app in the selected list:
+                        // "Nếu không đang ở trong app đã được thêm vào danh sách thì sẽ không thể thay đổi được trạn thái của bất kỳ app nào"
+                        Toast.makeText(
+                            this,
+                            "Chỉ có thể bật/tắt cách ly khi đang mở ứng dụng trong danh sách!",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        return
                     }
                 } else {
                     if (activeApps.isEmpty() && bubblePackages.isEmpty()) {
                         Toast.makeText(
                             this,
-                            "Chưa có ứng dụng nào được kích hoạt trong danh sách!",
+                            "Chưa có ứng dụng nào được chọn trong danh sách!",
                             Toast.LENGTH_SHORT
                         ).show()
                         return
                     }
 
+                    val isCurrentlyIsolated = PreferencesManager.isAppIsolationActive(this) && activeApps.isNotEmpty()
+                    if (isCurrentlyIsolated) {
+                        // Chế độ tất cả app: hủy cách ly cũng yêu cầu nhấn 2 lần
+                        val now = System.currentTimeMillis()
+                        if (now - lastUnisolateConfirmTimestamp > 2500L) {
+                            lastUnisolateConfirmTimestamp = now
+                            Toast.makeText(
+                                this,
+                                "Nhấn thêm lần nữa để tạm dừng cách ly",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            return
+                        }
+                        lastUnisolateConfirmTimestamp = 0L
+                    } else {
+                        lastUnisolateConfirmTimestamp = 0L
+                    }
+
                     val isolated = PreferencesManager.toggleAppIsolationActive(this)
+                    val updatedActiveCount = PreferencesManager.getEffectiveBlockedPackages(this).size
                     val msg = if (isolated) {
-                        "Đang cách ly mạng ${activeApps.size} ứng dụng đã chọn"
+                        "Đang cách ly mạng $updatedActiveCount ứng dụng đã chọn"
                     } else {
                         "Đã tạm dừng cách ly tất cả ứng dụng"
                     }
@@ -519,18 +604,24 @@ class BubbleService : Service() {
                 updateQuickBallState()
             }
             ActionType.WIFI -> {
+                lastUnisolateConfirmTimestamp = 0L
+                lastUnisolateConfirmPackage = null
                 val activeApps = PreferencesManager.getActivePackages(this)
                 hudLastActiveApp = ForegroundAppDetector.getLastUserForegroundPackage(this, activeApps)
                     ?: ForegroundAppDetector.getForegroundPackage(this)?.takeIf { activeApps.contains(it) }
                 NetworkSettingsHelper.openWifiPanel(this)
             }
             ActionType.DATA -> {
+                lastUnisolateConfirmTimestamp = 0L
+                lastUnisolateConfirmPackage = null
                 val activeApps = PreferencesManager.getActivePackages(this)
                 hudLastActiveApp = ForegroundAppDetector.getLastUserForegroundPackage(this, activeApps)
                     ?: ForegroundAppDetector.getForegroundPackage(this)?.takeIf { activeApps.contains(it) }
                 NetworkSettingsHelper.openDataPanel(this)
             }
             ActionType.AIRPLANE -> {
+                lastUnisolateConfirmTimestamp = 0L
+                lastUnisolateConfirmPackage = null
                 val activeApps = PreferencesManager.getActivePackages(this)
                 hudLastActiveApp = ForegroundAppDetector.getLastUserForegroundPackage(this, activeApps)
                     ?: ForegroundAppDetector.getForegroundPackage(this)?.takeIf { activeApps.contains(it) }
@@ -546,31 +637,13 @@ class BubbleService : Service() {
         val selectedApps = PreferencesManager.getBubblePackages(this)
         val activeApps = PreferencesManager.getActivePackages(this)
 
-        if (activeApps.isEmpty()) return
+        if (selectedApps.isEmpty()) return
 
         if (mode == PreferencesManager.ISOLATION_MODE_FOREGROUND) {
-            val currentFg = ForegroundAppDetector.getForegroundPackage(this)
-            var targetPkg: String? = if (currentFg != null && activeApps.contains(currentFg)) {
-                currentFg
-            } else {
-                null
-            }
-
-            if (targetPkg == null && hudLastActiveApp != null && activeApps.contains(hudLastActiveApp)) {
-                targetPkg = hudLastActiveApp
-            }
-
-            if (targetPkg == null) {
-                targetPkg = ForegroundAppDetector.getLastUserForegroundPackage(this, activeApps)
-            }
-
-            if (targetPkg == null && activeApps.size == 1) {
-                targetPkg = activeApps.first()
-            }
-
-            if (targetPkg != null) {
+            val targetPkg = PreferencesManager.getForegroundTunnelPackage()
+            if (targetPkg != null && activeApps.contains(targetPkg)) {
                 PreferencesManager.setPackageActive(this, targetPkg, false)
-                hudLastActiveApp = null
+                hudPausedByUserSessionApp = targetPkg
                 val appLabel = try {
                     val appInfo = packageManager.getApplicationInfo(targetPkg, 0)
                     packageManager.getApplicationLabel(appInfo).toString()
@@ -585,26 +658,28 @@ class BubbleService : Service() {
                 updateQuickBallState()
             }
         } else {
-            // Mode All: Only valid if exactly 1 app is selected
-            if (selectedApps.size == 1) {
-                val singlePkg = selectedApps.first()
-                if (activeApps.contains(singlePkg) || PreferencesManager.isAppIsolationActive(this)) {
-                    PreferencesManager.setPackageActive(this, singlePkg, false)
-                    PreferencesManager.setAppIsolationActive(this, false)
-                    hudLastActiveApp = null
+            // Mode All: un-isolate all apps when network is restored
+            if (PreferencesManager.isAppIsolationActive(this)) {
+                PreferencesManager.setAppIsolationActive(this, false)
+                hudLastActiveApp = null
+                val message = if (selectedApps.size == 1) {
+                    val singlePkg = selectedApps.first()
                     val appLabel = try {
                         val appInfo = packageManager.getApplicationInfo(singlePkg, 0)
                         packageManager.getApplicationLabel(appInfo).toString()
                     } catch (_: Exception) {
                         singlePkg
                     }
-                    Toast.makeText(
-                        this,
-                        "Đã tự động hủy cách ly cho $appLabel sau khi bật lại mạng",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                    updateQuickBallState()
+                    "Đã tự động hủy cách ly cho $appLabel sau khi bật lại mạng"
+                } else {
+                    "Đã tự động hủy cách ly cho các ứng dụng đã chọn sau khi bật lại mạng"
                 }
+                Toast.makeText(
+                    this,
+                    message,
+                    Toast.LENGTH_SHORT
+                ).show()
+                updateQuickBallState()
             }
         }
     }
@@ -618,16 +693,8 @@ class BubbleService : Service() {
 
         val mode = PreferencesManager.getIsolationMode(this)
         return if (mode == PreferencesManager.ISOLATION_MODE_FOREGROUND) {
-            val fg = ForegroundAppDetector.getForegroundPackage(this)
-            val bubbleSet = PreferencesManager.getBubblePackages(this)
-            // If viewing a managed app, reflect that specific app's isolation state
-            if (fg != null && bubbleSet.contains(fg)) {
-                activeSet.contains(fg)
-            } else {
-                // When on Launcher, inside OwlNetGuard, or in unmanaged apps:
-                // Since VPN is active and apps are isolated in background, reflect Active state (RED)
-                true
-            }
+            val fgTunnelPkg = PreferencesManager.getForegroundTunnelPackage()
+            fgTunnelPkg != null && activeSet.contains(fgTunnelPkg)
         } else {
             true
         }
@@ -755,112 +822,22 @@ class BubbleService : Service() {
         isAdded = false
     }
 
-    private fun startForegroundWithNotification() {
-        val channelId = "owl_bubble_control_channel"
-        val nm = getSystemService(NotificationManager::class.java)
-        if (nm != null) {
-            val channel = NotificationChannel(
-                channelId,
-                "Thanh điều khiển OwlNetGuard",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Điều khiển nhanh bong bóng nổi và cách ly ứng dụng"
-                setShowBadge(false)
-            }
-            nm.createNotificationChannel(channel)
-        }
-
-        val isIsolated = PreferencesManager.isBubbleIsolated(this)
-        val activeCount = PreferencesManager.getActivePackages(this).size
-
-        val openAppIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        }
-        val contentPending = PendingIntent.getActivity(
-            this,
-            200,
-            openAppIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val toggleIsolateIntent = Intent(this, NotificationActionReceiver::class.java).apply {
-            action = NotificationActionReceiver.ACTION_TOGGLE_ISOLATE
-        }
-        val toggleIsolatePending = PendingIntent.getBroadcast(
-            this,
-            201,
-            toggleIsolateIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val hideBubbleIntent = Intent(this, NotificationActionReceiver::class.java).apply {
-            action = NotificationActionReceiver.ACTION_TOGGLE_BUBBLE_VISIBILITY
-        }
-        val hideBubblePending = PendingIntent.getBroadcast(
-            this,
-            202,
-            hideBubbleIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val statusText = if (isIsolated) {
-            "Chế độ cách ly đang bật ($activeCount ứng dụng kích hoạt)"
-        } else {
-            "Bong bóng nổi đang trực ($activeCount ứng dụng kích hoạt)"
-        }
-
-        val notification: Notification = NotificationCompat.Builder(this, channelId)
-            .setContentTitle("OwlNetGuard Bong bóng nổi")
-            .setContentText(statusText)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentIntent(contentPending)
-            .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .addAction(
-                if (isIsolated) R.drawable.ic_shield_normal else R.drawable.ic_shield_isolated,
-                if (isIsolated) "Tắt cách ly" else "Bật cách ly",
-                toggleIsolatePending
-            )
-            .addAction(
-                R.drawable.ic_bubble_inactive,
-                "Tắt phím nổi",
-                hideBubblePending
-            )
-            .build()
-
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                startForeground(
-                    NOTIFICATION_ID,
-                    notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-                )
-            } else {
-                startForeground(NOTIFICATION_ID, notification)
-            }
-        } catch (_: Exception) {
-            try {
-                startForeground(NOTIFICATION_ID, notification)
-            } catch (_: Exception) {
-            }
-        }
-    }
-
     override fun onDestroy() {
         serviceScope.cancel()
         try {
             unregisterReceiver(networkChangeReceiver)
         } catch (_: Exception) {
         }
+        handler.removeCallbacks(foregroundStateWatcher)
+        handler.removeCallbacks(idleFadeRunnable)
         removeQuickBall()
         super.onDestroy()
     }
 
     companion object {
-        private const val NOTIFICATION_ID = 1001
-
         fun shouldShowBubble(context: Context): Boolean {
-            return PreferencesManager.isBubbleOverlayEnabled(context) &&
+            return PreferencesManager.isVpnEnabled(context) &&
+                PreferencesManager.isBubbleOverlayEnabled(context) &&
                 Settings.canDrawOverlays(context)
         }
 
@@ -869,11 +846,7 @@ class BubbleService : Service() {
             if (shouldShowBubble(appCtx)) {
                 try {
                     val intent = Intent(appCtx, BubbleService::class.java)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        appCtx.startForegroundService(intent)
-                    } else {
-                        appCtx.startService(intent)
-                    }
+                    appCtx.startService(intent)
                 } catch (_: Exception) {
                 }
             } else {
@@ -882,6 +855,7 @@ class BubbleService : Service() {
                 } catch (_: Exception) {
                 }
             }
+            LocalVpnService.updateNotification(appCtx)
         }
     }
 }

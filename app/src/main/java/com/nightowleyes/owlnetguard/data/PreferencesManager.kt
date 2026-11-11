@@ -9,14 +9,13 @@ import androidx.core.content.edit
 import com.nightowleyes.owlnetguard.service.BubbleService
 import com.nightowleyes.owlnetguard.service.LocalVpnService
 import com.nightowleyes.owlnetguard.service.QuickTileService
-import com.nightowleyes.owlnetguard.utils.ForegroundAppDetector
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 object PreferencesManager {
     private const val PREFS_NAME = "owl_netguard_prefs"
-    private const val KEY_DEFAULTS_INIT = "defaults_initialized_v7"
+    private const val KEY_DEFAULTS_INIT = "defaults_initialized_v8"
     private const val KEY_VPN_ENABLED = "vpn_background_enabled"
     private const val KEY_ISOLATION_ACTIVE = "app_isolation_active"
     private const val KEY_SHOW_BUBBLE = "show_floating_bubble"
@@ -28,6 +27,7 @@ object PreferencesManager {
     private const val KEY_BUBBLE_PACKAGES = "bubble_packages"
     private const val KEY_ACTIVE_PACKAGES = "active_bubble_packages"
     private const val KEY_ISOLATION_MODE = "isolation_mode"
+    private const val KEY_EXCLUDED_OVERLAY_PACKAGES = "excluded_overlay_packages"
 
     const val ISOLATION_MODE_ALL = 0
     const val ISOLATION_MODE_FOREGROUND = 1
@@ -64,6 +64,10 @@ object PreferencesManager {
                 putBoolean(KEY_SHOW_BUBBLE_DATA, sp.getBoolean(KEY_SHOW_BUBBLE_DATA, true))
                 putBoolean(KEY_SHOW_BUBBLE_AIRPLANE, sp.getBoolean(KEY_SHOW_BUBBLE_AIRPLANE, false))
                 putInt(KEY_ISOLATION_MODE, sp.getInt(KEY_ISOLATION_MODE, ISOLATION_MODE_ALL))
+                putBoolean(KEY_AUTO_UNISOLATE_ON_RECONNECT, sp.getBoolean(KEY_AUTO_UNISOLATE_ON_RECONNECT, true))
+                if (!sp.contains(KEY_EXCLUDED_OVERLAY_PACKAGES)) {
+                    putStringSet(KEY_EXCLUDED_OVERLAY_PACKAGES, setOf("com.facebook.orca", "com.zing.zalo"))
+                }
                 putBoolean(KEY_DEFAULTS_INIT, true)
             }
         }
@@ -80,6 +84,9 @@ object PreferencesManager {
     }
 
     fun setVpnEnabled(context: Context, enabled: Boolean) {
+        if (!enabled) {
+            foregroundTunnelPackage = null
+        }
         prefs(context).edit {
             putBoolean(KEY_VPN_ENABLED, enabled)
             if (enabled) {
@@ -89,11 +96,7 @@ object PreferencesManager {
         syncIsolation(context)
     }
 
-    fun toggleVpnEnabled(context: Context): Boolean {
-        val newEnabled = !isVpnEnabled(context)
-        setVpnEnabled(context, newEnabled)
-        return newEnabled
-    }
+
 
     // --- 2. Isolation Sub-State (Controlled by Floating Bubble without stopping background service) ---
 
@@ -103,8 +106,13 @@ object PreferencesManager {
 
     fun setAppIsolationActive(context: Context, active: Boolean) {
         if (!isVpnEnabled(context)) return
+        val currentActive = getActivePackages(context)
+        val bubble = getBubblePackages(context)
         prefs(context).edit {
             putBoolean(KEY_ISOLATION_ACTIVE, active)
+            if (active && currentActive.isEmpty() && bubble.isNotEmpty()) {
+                putStringSet(KEY_ACTIVE_PACKAGES, LinkedHashSet(bubble))
+            }
         }
         syncIsolation(context)
     }
@@ -118,8 +126,6 @@ object PreferencesManager {
     // Compatibility aliases for Bubble & Tile toggles
     fun isBubbleIsolated(context: Context): Boolean = isAppIsolationActive(context)
 
-    fun setBubbleIsolated(context: Context, isolated: Boolean) = setAppIsolationActive(context, isolated)
-
     fun toggleBubbleIsolation(context: Context): Boolean = toggleAppIsolationActive(context)
 
     // --- 3. Floating Bubble HUD Overlay ("Bong bóng nổi thông minh") ---
@@ -129,7 +135,17 @@ object PreferencesManager {
     }
 
     fun setBubbleOverlayEnabled(context: Context, enabled: Boolean) {
-        prefs(context).edit { putBoolean(KEY_SHOW_BUBBLE, enabled) }
+        prefs(context).edit {
+            putBoolean(KEY_SHOW_BUBBLE, enabled)
+            if (!enabled && getIsolationMode(context) == ISOLATION_MODE_FOREGROUND) {
+                putInt(KEY_ISOLATION_MODE, ISOLATION_MODE_ALL)
+                val bubble = getBubblePackages(context)
+                putStringSet(KEY_ACTIVE_PACKAGES, LinkedHashSet(bubble))
+            }
+        }
+        if (!enabled) {
+            foregroundTunnelPackage = null
+        }
         BubbleService.sync(context)
         notifyStateChanged()
     }
@@ -180,11 +196,91 @@ object PreferencesManager {
 
     // --- 4. Isolation Mode (ALL vs FOREGROUND) ---
 
+    @Volatile
+    private var foregroundTunnelPackage: String? = null
+
+    fun getForegroundTunnelPackage(): String? = foregroundTunnelPackage
+
+    fun setForegroundTunnelPackage(context: Context, packageName: String?) {
+        if (foregroundTunnelPackage == packageName) return
+        foregroundTunnelPackage = packageName
+        val sp = prefs(context)
+        if (packageName != null) {
+            sp.edit {
+                putStringSet(KEY_ACTIVE_PACKAGES, setOf(packageName))
+                putBoolean(KEY_ISOLATION_ACTIVE, true)
+            }
+        } else {
+            sp.edit {
+                putStringSet(KEY_ACTIVE_PACKAGES, emptySet())
+            }
+        }
+        syncIsolation(context)
+    }
+
     fun getIsolationMode(context: Context): Int =
         prefs(context).getInt(KEY_ISOLATION_MODE, ISOLATION_MODE_ALL)
 
     fun setIsolationMode(context: Context, mode: Int) {
-        prefs(context).edit { putInt(KEY_ISOLATION_MODE, mode) }
+        prefs(context).edit {
+            putInt(KEY_ISOLATION_MODE, mode)
+            if (mode == ISOLATION_MODE_FOREGROUND) {
+                // Chế độ 'Chỉ app đang mở': tất cả các app chuyển về trạng thái 'Đang tạm dừng'
+                // Khi chuyển qua chỉ app đang mở thì không có app nào được đưa vào đường hầm mạng cả
+                putStringSet(KEY_ACTIVE_PACKAGES, emptySet())
+                putBoolean(KEY_ISOLATION_ACTIVE, true)
+            } else {
+                // Chế độ 'Tất cả app đã chọn': tất cả app trong danh sách chuyển sang 'Đang cách ly'
+                val bubble = getBubblePackages(context)
+                putStringSet(KEY_ACTIVE_PACKAGES, LinkedHashSet(bubble))
+                putBoolean(KEY_ISOLATION_ACTIVE, true)
+            }
+        }
+        foregroundTunnelPackage = null
+        syncIsolation(context)
+    }
+
+    // --- 4b. Excluded Overlay Packages (Bong bóng chat, ứng dụng nổi) ---
+
+    fun getExcludedOverlayPackages(context: Context): Set<String> {
+        val set = prefs(context).getStringSet(KEY_EXCLUDED_OVERLAY_PACKAGES, null)
+        return if (set != null) LinkedHashSet(set) else setOf("com.facebook.orca", "com.zing.zalo")
+    }
+
+    fun setExcludedOverlayPackages(context: Context, packages: Set<String>) {
+        prefs(context).edit {
+            putStringSet(KEY_EXCLUDED_OVERLAY_PACKAGES, LinkedHashSet(packages))
+        }
+        notifyStateChanged()
+    }
+
+    fun toggleExcludedOverlayPackage(context: Context, packageName: String): Boolean {
+        val current = LinkedHashSet(getExcludedOverlayPackages(context))
+        val added = if (current.contains(packageName)) {
+            current.remove(packageName)
+            false
+        } else {
+            current.add(packageName)
+            true
+        }
+        setExcludedOverlayPackages(context, current)
+        return added
+    }
+
+    fun clearActivePackages(context: Context) {
+        foregroundTunnelPackage = null
+        prefs(context).edit {
+            putStringSet(KEY_ACTIVE_PACKAGES, emptySet())
+        }
+        syncIsolation(context)
+    }
+
+    fun setActiveForegroundApp(context: Context, packageName: String) {
+        foregroundTunnelPackage = packageName
+        prefs(context).edit {
+            putStringSet(KEY_ACTIVE_PACKAGES, setOf(packageName))
+            putBoolean(KEY_ISOLATION_ACTIVE, true)
+        }
         syncIsolation(context)
     }
 
@@ -218,13 +314,22 @@ object PreferencesManager {
 
     /**
      * Returns the packages that should currently have their traffic routed into the sinkhole.
-     * All activated apps in `activePackages` are continuously blocked.
-     * When using the Bubble's "Chỉ ứng dụng đang mở" mode, tapping the bubble toggles that specific
-     * open app in or out of `activePackages`, leaving the other apps continuously isolated!
+     * All activated apps in `activePackages` are actively isolated ("ĐANG CÁCH LY").
+     * Apps marked "ĐANG TẠM DỪNG" retain normal internet access.
      */
     fun getEffectiveBlockedPackages(context: Context): Set<String> {
         if (!isAppIsolationActive(context)) return emptySet()
-        return getActivePackages(context)
+        val mode = getIsolationMode(context)
+        return if (mode == ISOLATION_MODE_FOREGROUND) {
+            val fg = foregroundTunnelPackage
+            if (fg != null && getActivePackages(context).contains(fg)) {
+                setOf(fg)
+            } else {
+                emptySet()
+            }
+        } else {
+            getActivePackages(context)
+        }
     }
 
     fun togglePackageInBubble(context: Context, packageName: String): Boolean {
@@ -282,7 +387,7 @@ object PreferencesManager {
 
         sp.edit {
             putStringSet(KEY_ACTIVE_PACKAGES, currentActive)
-            if (nowActive) {
+            if (nowActive || currentActive.isNotEmpty()) {
                 putBoolean(KEY_ISOLATION_ACTIVE, true)
             }
         }
@@ -301,7 +406,7 @@ object PreferencesManager {
         if (changed) {
             sp.edit {
                 putStringSet(KEY_ACTIVE_PACKAGES, currentActive)
-                if (active) {
+                if (active || currentActive.isNotEmpty()) {
                     putBoolean(KEY_ISOLATION_ACTIVE, true)
                 }
             }

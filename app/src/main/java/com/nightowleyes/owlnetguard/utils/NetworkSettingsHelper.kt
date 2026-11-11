@@ -16,6 +16,7 @@ import android.os.Looper
 import android.provider.Settings
 import android.telephony.TelephonyManager
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -46,13 +47,11 @@ object NetworkSettingsHelper {
             val cm = appCtx.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
             if (cm != null) {
                 // 1. Default network callback (fires on network switches/losses)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    cm.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
-                        override fun onAvailable(network: Network) { updateStatus(appCtx) }
-                        override fun onLost(network: Network) { updateStatus(appCtx) }
-                        override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) { updateStatus(appCtx) }
-                    })
-                }
+                cm.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
+                    override fun onAvailable(network: Network) { updateStatus(appCtx) }
+                    override fun onLost(network: Network) { updateStatus(appCtx) }
+                    override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) { updateStatus(appCtx) }
+                })
 
                 // 2. Comprehensive network callback for all physical network interfaces
                 val request = NetworkRequest.Builder().build()
@@ -74,6 +73,9 @@ object NetworkSettingsHelper {
                 addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED)
                 @Suppress("DEPRECATION")
                 addAction(ConnectivityManager.CONNECTIVITY_ACTION)
+                addAction("android.intent.action.ANY_DATA_STATE")
+                addAction("android.telephony.action.CARRIER_SIGNAL_DEFAULT_NETWORK_AVAILABLE")
+                addAction("android.telephony.action.DATA_ENABLED_CHANGED")
             }
             val receiver = object : BroadcastReceiver() {
                 override fun onReceive(c: Context?, intent: Intent?) {
@@ -82,11 +84,12 @@ object NetworkSettingsHelper {
                     }
                 }
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                appCtx.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
-            } else {
-                appCtx.registerReceiver(receiver, filter)
-            }
+            ContextCompat.registerReceiver(
+                appCtx,
+                receiver,
+                filter,
+                ContextCompat.RECEIVER_EXPORTED
+            )
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -103,6 +106,19 @@ object NetworkSettingsHelper {
                 true,
                 observer
             )
+            try {
+                appCtx.contentResolver.registerContentObserver(
+                    Settings.Global.getUriFor("mobile_data0"),
+                    true,
+                    observer
+                )
+                appCtx.contentResolver.registerContentObserver(
+                    Settings.Global.getUriFor("mobile_data1"),
+                    true,
+                    observer
+                )
+            } catch (_: Exception) {
+            }
             appCtx.contentResolver.registerContentObserver(
                 Settings.Global.getUriFor(Settings.Global.AIRPLANE_MODE_ON),
                 false,
@@ -130,6 +146,7 @@ object NetworkSettingsHelper {
         if (cm != null) {
             try {
                 // Query all physical and virtual networks so VPN doesn't mask Wi-Fi / Cell hardware state
+                @Suppress("DEPRECATION")
                 val allNets = cm.allNetworks
                 for (net in allNets) {
                     val caps = cm.getNetworkCapabilities(net) ?: continue
@@ -187,16 +204,34 @@ object NetworkSettingsHelper {
             false
         }
 
-        val mobileDataSetting = try {
-            Settings.Global.getInt(appCtx.contentResolver, "mobile_data", -1)
+        // 1. Primary check: TelephonyManager.isDataEnabled (API 26+)
+        val tmDataEnabled: Boolean? = try {
+            tm?.isDataEnabled
+        } catch (_: SecurityException) {
+            null
         } catch (_: Exception) {
-            -1
+            null
+        }
+
+        // 2. Query Settings.Global for sub-specific or global mobile_data keys
+        val settingsDataEnabled: Boolean? = try {
+            val cr = appCtx.contentResolver
+            val md = Settings.Global.getInt(cr, "mobile_data", -1)
+            val md0 = Settings.Global.getInt(cr, "mobile_data0", -1)
+            val md1 = Settings.Global.getInt(cr, "mobile_data1", -1)
+            when {
+                md == 0 || md0 == 0 || md1 == 0 -> false
+                md == 1 || md0 == 1 || md1 == 1 -> true
+                else -> null
+            }
+        } catch (_: Exception) {
+            null
         }
 
         val cellConnected = when {
             airplaneModeOn || simAbsent -> false
-            mobileDataSetting == 0 -> false
-            mobileDataSetting == 1 -> true
+            tmDataEnabled != null -> tmDataEnabled
+            settingsDataEnabled != null -> settingsDataEnabled
             else -> cellTransportConnected
         }
 

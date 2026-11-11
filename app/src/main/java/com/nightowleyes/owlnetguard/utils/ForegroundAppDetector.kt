@@ -9,6 +9,7 @@ import android.os.Process
 import android.provider.Settings
 import android.widget.Toast
 import androidx.core.net.toUri
+import com.nightowleyes.owlnetguard.data.PreferencesManager
 
 object ForegroundAppDetector {
 
@@ -63,8 +64,8 @@ object ForegroundAppDetector {
             val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
                 ?: return lastKnownForegroundPackage
             val now = System.currentTimeMillis()
-            // First check recent 2 minutes
-            var events = usm.queryEvents(now - 120_000L, now)
+            // First check recent 3 minutes
+            var events = usm.queryEvents(now - 180_000L, now)
             val event = UsageEvents.Event()
             var latestPkg: String? = null
             var latestTime = 0L
@@ -73,8 +74,12 @@ object ForegroundAppDetector {
                 events.getNextEvent(event)
                 if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
                     val pkg = event.packageName
+                    val cls = event.className ?: ""
+                    val isSettingsPanel = pkg?.contains("settings", ignoreCase = true) == true &&
+                        cls.contains("panel", ignoreCase = true)
                     if (!pkg.isNullOrBlank() &&
                         pkg != "com.android.systemui" &&
+                        !isSettingsPanel &&
                         event.timeStamp >= latestTime
                     ) {
                         latestTime = event.timeStamp
@@ -88,14 +93,18 @@ object ForegroundAppDetector {
                 return latestPkg
             }
 
-            // Fallback: wider range 10 minutes
-            events = usm.queryEvents(now - 600_000L, now)
+            // Fallback: wider range 15 minutes
+            events = usm.queryEvents(now - 900_000L, now)
             while (events.hasNextEvent()) {
                 events.getNextEvent(event)
                 if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
                     val pkg = event.packageName
+                    val cls = event.className ?: ""
+                    val isSettingsPanel = pkg?.contains("settings", ignoreCase = true) == true &&
+                        cls.contains("panel", ignoreCase = true)
                     if (!pkg.isNullOrBlank() &&
                         pkg != "com.android.systemui" &&
+                        !isSettingsPanel &&
                         event.timeStamp >= latestTime
                     ) {
                         latestTime = event.timeStamp
@@ -109,7 +118,7 @@ object ForegroundAppDetector {
                 return latestPkg
             }
 
-            val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_BEST, now - 600_000L, now)
+            val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, now - 86_400_000L, now)
             val mostRecent = stats
                 ?.filter {
                     it.packageName != "com.android.systemui" &&
@@ -126,15 +135,9 @@ object ForegroundAppDetector {
         }
     }
 
-    /**
-     * Determines whether a package belongs to Android system, settings, launcher, or OwlNetGuard itself.
-     */
-    fun isSystemOrSettingsOrLauncher(context: Context, packageName: String?): Boolean {
+    fun isHomeLauncher(context: Context, packageName: String?): Boolean {
         if (packageName.isNullOrBlank()) return true
-        if (packageName == "com.android.systemui" || packageName == context.packageName) return true
-        if (packageName.contains("settings", ignoreCase = true)) return true
         if (packageName.contains("launcher", ignoreCase = true) || packageName.contains("quickstep", ignoreCase = true)) return true
-
         try {
             val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
             val resolveInfo = context.packageManager.resolveActivity(intent, 0)
@@ -142,6 +145,40 @@ object ForegroundAppDetector {
                 return true
             }
         } catch (_: Exception) {}
+        return false
+    }
+
+    /**
+     * Determines whether a package belongs to Android system, settings, launcher, or OwlNetGuard itself.
+     */
+    fun isSystemOrSettingsOrLauncher(context: Context, packageName: String?): Boolean {
+        if (packageName.isNullOrBlank()) return true
+        if (packageName == "com.android.systemui" || packageName == context.packageName) return true
+        if (packageName.contains("settings", ignoreCase = true)) return true
+        return isHomeLauncher(context, packageName)
+    }
+
+    /**
+     * Comprehensive check for transient system overlays, Wi-Fi / settings panels, keyboards,
+     * permission dialogs, or user-configured excluded overlay apps (e.g. Messenger chat heads, Zalo).
+     */
+    fun isTransientOverlayOrSystemOrExcluded(context: Context, packageName: String?): Boolean {
+        if (packageName.isNullOrBlank()) return true
+        if (packageName == "com.android.systemui") return true
+        if (packageName.contains("settings", ignoreCase = true)) return true
+        if (packageName.contains("permissioncontroller", ignoreCase = true)) return true
+        if (packageName.contains("inputmethod", ignoreCase = true) ||
+            packageName.contains("keyboard", ignoreCase = true) ||
+            packageName.contains("honeyboard", ignoreCase = true) ||
+            packageName.contains("labankey", ignoreCase = true)
+        ) return true
+
+        // User-configured Excluded Overlay Apps (Cách B)
+        try {
+            val excludedSet = PreferencesManager.getExcludedOverlayPackages(context)
+            if (excludedSet.contains(packageName)) return true
+        } catch (_: Exception) {}
+
         return false
     }
 

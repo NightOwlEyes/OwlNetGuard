@@ -110,10 +110,17 @@ class DraggableBubbleContainer @JvmOverloads constructor(
                 if (isDragging) {
                     isDragging = false
                     dragListener?.onDragEnd()
+                } else if (ev.actionMasked == MotionEvent.ACTION_UP && !isLongPressed) {
+                    performClick()
                 }
                 return true
             }
         }
         return super.onTouchEvent(ev)
+    }
+
+    override fun performClick(): Boolean {
+        super.performClick()
+        return true
     }
 }

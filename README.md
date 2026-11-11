@@ -10,14 +10,14 @@
 
 <p align="center">
   <a href="https://github.com/NightOwlEyes/OwlNetGuard/releases/latest">
-    <img src="https://img.shields.io/badge/Release-v1.0-8A2BE2?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.0" />
+    <img src="https://img.shields.io/badge/Release-v1.0-8A2BE2?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.1" />
   </a>
-  <a href="https://github.com/NightOwlEyes/OwlNetGuard/releases/latest/download/app-release.apk">
+  <a href="https://github.com/NightOwlEyes/OwlNetGuard/releases/latest">
     <img src="https://img.shields.io/badge/Download-APK-00E5FF?style=for-the-badge&logo=google-play&logoColor=black" alt="Tải về APK" />
   </a>
   <img src="https://img.shields.io/badge/Android-8.0%2B-blueviolet?style=for-the-badge&logo=android" alt="Android 8.0+" />
   <img src="https://img.shields.io/badge/Play_Protect-100%25_Compliant-success?style=for-the-badge&logo=googleplay" alt="Play Protect Safe" />
-  <a href="https://www.virustotal.com/gui/file/29ba085b6c5abab0e5f5bab32d1bfe2d30963c7e353f7055a6dfccd11e3ee9bd">
+  <a href="https://www.virustotal.com/gui/file/479c0bc4db074c4ce8c2cc77010e2637bc7a2286fc45084c3147a49ff97f3b68">
     <img src="https://img.shields.io/badge/VirusTotal-Clean%20(0%2F71)-brightgreen?style=for-the-badge&logo=virustotal" alt="VirusTotal Clean" />
   </a>
   <a href="LICENSE">
@@ -26,7 +26,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/NightOwlEyes/OwlNetGuard/releases/latest/download/app-release.apk">
+  <a href="https://github.com/NightOwlEyes/OwlNetGuard/releases/latest">
     <img src="https://img.shields.io/badge/⚡_TẢI_VỀ_BẢN_MỚI_NHẤT_(APK)-8A2BE2?style=for-the-badge&labelColor=1a1630&logo=android" alt="Download APK Button" height="42" />
   </a>
 </p>
@@ -46,21 +46,27 @@
 * 🛡️ **Lõi VPN Sinkhole cục bộ**: 100% lưu lượng mạng được xử lý trực tiếp trên thiết bị, bảo đảm quyền riêng tư tuyệt đối, không gửi dữ liệu ra ngoài và không hao pin.
 * 🔮 **Bong bóng nổi thông minh (HUD Quick Ball)**:
   * Phím nổi thu gọn tiện dụng trên màn hình, hỗ trợ điều khiển nhanh: Cách ly, Wi-Fi, Dữ liệu di động, Chế độ máy bay.
-  * Nhấn giữ vào biểu tượng con cú để tắt nhanh.
-   * **Chỉ báo trạng thái trực quan**: Biểu tượng Cú tự động đổi màu **Đỏ thẫm phát sáng** khi ứng dụng đang mở bị cách ly và màu **Tím** khi bình thường. Biểu tượng Wi-Fi / Dữ liệu tự động gạch chéo mờ khi ngắt mạng.
-  * Kéo thả mượt mà từ bất kỳ vị trí nào trên phím nổi, tự động hít sát viền màn hình, nhấn giữ để tắt HUD nhanh chóng.
+  * **Cơ chế nhấn 2 lần để hủy cách ly**: Khi app đang cách ly, chạm lần 1 sẽ hiện thông báo *"Nhấn thêm lần nữa để tạm dừng cách ly"*, chạm lần 2 trong vòng 2.5s mới xác nhận mở mạng.
+  * **Chỉ báo trạng thái trực quan**: Biểu tượng Cú tự động đổi màu **Đỏ thẫm phát sáng** khi ứng dụng đang mở bị cách ly và màu **Tím** khi bình thường. Biểu tượng Wi-Fi / Dữ liệu tự động gạch chéo mờ khi ngắt mạng.
+  * Nhấn giữ để tắt HUD nhanh chóng.
 * 🔄 **Tự động hủy cách ly khi bật lại mạng**:
-  * Khi toàn bộ kết nối mạng (cả Wi-Fi lẫn Dữ liệu di động) bị ngắt rồi được kết nối mạng trở lại, hệ thống tự động giải phóng cách ly cho ứng dụng đang sử dụng (hoặc ứng dụng duy nhất được chọn).
+  * Khi toàn bộ kết nối mạng (cả Wi-Fi lẫn Dữ liệu di động) bị ngắt rồi được bật trở lại, hệ thống tự động giải phóng cách ly cho ứng dụng.
 * 🎯 **Hai chế độ cô lập mạng linh hoạt**:
   * **Tất cả ứng dụng đã chọn**: Tạm ngưng hoặc kích hoạt chặn mạng hàng loạt cho toàn bộ danh sách chỉ với 1 chạm.
-  * **Chỉ ứng dụng đang mở (Foreground Mode)**: Tự động phát hiện ứng dụng bạn đang sử dụng trên màn hình. Khi bấm nút *Cô lập* trên phím nổi, hệ thống sẽ **bật/tắt mạng riêng cho đúng ứng dụng đó**, trong khi các ứng dụng nền khác vẫn tiếp tục bị cách ly liên tục mà không hề bị gián đoạn.
+  * **Chỉ ứng dụng đang mở (Foreground Mode)**:
+    * Khi chưa mở app trong danh sách: Tạm ngưng hoặc kích hoạt chặn mạng cho ứng dụng đang mở trên màn hình chỉ với 1 chạm.
+    * Hỗ trợ **Danh sách ứng dụng ngoại lệ (Lớp phủ)**: Khi có Bảng Wi-Fi, bàn phím, hay bong bóng chat (Messenger, Zalo...) hiển thị đè lên app đang cách ly sẽ không làm ngắt phiên cách ly của app bên dưới.
 ---
 
 ## 📸 Ảnh chụp màn hình ứng dụng
 
-| Bảng điều khiển chính (VPN & HUD) | Bảng chọn ứng dụng (App Picker) | Phiên bản & Cài đặt |
+| Bảng điều khiển chính (Faceted & HUD) | Phím nổi HUD mở rộng điều khiển | Bảng chọn ứng dụng (App Picker) |
 | :---: | :---: | :---: |
-| ![Bảng điều khiển](docs/screenshots/active_dashboard.png) | ![Bảng chọn ứng dụng](docs/screenshots/app_picker.png) | ![Menu Cài đặt](docs/screenshots/menu_version.png) |
+| ![Bảng điều khiển](docs/screenshots/active_dashboard.png) | ![Phím nổi HUD mở rộng](docs/screenshots/floating_hud_expanded.png) | ![Bảng chọn ứng dụng](docs/screenshots/app_picker.png) |
+
+| Ứng dụng ngoại lệ khi mở đè (Lớp phủ) | Menu phiên bản & Cài đặt |
+| :---: | :---: |
+| ![Ứng dụng ngoại lệ](docs/screenshots/excluded_apps.png) | ![Menu Cài đặt](docs/screenshots/menu_version.png) |
 
 ---
 
@@ -84,6 +90,12 @@ OwlNetGuard tuyệt đối không yêu cầu các quyền nhạy cảm nguy hi�
 
 ---
 
+## 📁 Cấu trúc thư mục (File Structure)
+
+> Chi tiết giải thích kiến trúc và luồng xử lý của từng tệp mã nguồn xem tại: [FILE_STRUCTURE.md](FILE_STRUCTURE.md)
+
+---
+
 ## 🛠️ Hướng dẫn tự build từ mã nguồn
 
 ### Yêu cầu:
@@ -104,7 +116,7 @@ cd OwlNetGuard
 .\gradlew.bat assembleRelease
 ```
 
-File APK sẽ nằm tại:
+File APK xuất xưởng sẽ nằm tại:
 `app/build/outputs/apk/release/app-release.apk`
 
 ---
@@ -112,8 +124,8 @@ File APK sẽ nằm tại:
 ## 🛡️ Kiểm định an toàn & VirusTotal
 
 OwlNetGuard hoàn toàn sạch mã độc, đạt chuẩn an toàn 100%:
-* 🟢 **Báo cáo VirusTotal**: [0/71 Nhà cung cấp bảo mật phát hiện - Clean 100%](https://www.virustotal.com/gui/file/29ba085b6c5abab0e5f5bab32d1bfe2d30963c7e353f7055a6dfccd11e3ee9bd)
-* 🟢 **Google Play Protect**: PASSED, hoạt động hoàn toàn offline không thu thập dữ liệu người dùng.
+* 🟢 **Báo cáo VirusTotal**: [0/68 Nhà cung cấp bảo mật phát hiện - Clean 100%](https://www.virustotal.com/gui/file/479c0bc4db074c4ce8c2cc77010e2637bc7a2286fc45084c3147a49ff97f3b68)
+* 🟢 **Google Play Protect**: Tuân thủ 100% tiêu chuẩn bảo mật của Android, hoạt động hoàn toàn offline không thu thập dữ liệu người dùng.
 
 ---
 

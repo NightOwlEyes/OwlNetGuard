@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- Top Left Lobe Facet B (Outer) -->
+    <path
+        android:fillColor="#FFFB7185"
+        android:pathData="M7.5,3.5 L3.5,6.5 L2.5,10.5 L8,10.5 Z" />
+
+    <!-- Top Left Lobe Facet A (Inner) -->
+    <path
+        android:fillColor="#FFF43F5E"
+        android:pathData="M7.5,3.5 L12,6 L12,8.5 L8,10.5 Z" />
+
+    <!-- Top Right Lobe Facet A (Inner) -->
+    <path
+        android:fillColor="#FFE11D48"
+        android:pathData="M16.5,3.5 L12,6 L12,8.5 L16,10.5 Z" />
+
+    <!-- Top Right Lobe Facet B (Outer) -->
+    <path
+        android:fillColor="#FFBE123C"
+        android:pathData="M16.5,3.5 L20.5,6.5 L21.5,10.5 L16,10.5 Z" />
+
+    <!-- Central Diamond Gem Facet (Table Highlight) -->
+    <path
+        android:fillColor="#FFFFB4D0"
+        android:pathData="M12,8.5 L16,10.5 L12,14.5 L8,10.5 Z" />
+
+    <!-- Lower Left Outer Facet -->
+    <path
+        android:fillColor="#FFE11D48"
+        android:pathData="M2.5,10.5 L8,10.5 L6.5,15.5 Z" />
+
+    <!-- Lower Left Inner Facet -->
+    <path
+        android:fillColor="#FFF43F5E"
+        android:pathData="M8,10.5 L12,14.5 L12,21.5 L6.5,15.5 Z" />
+
+    <!-- Lower Right Inner Facet -->
+    <path
+        android:fillColor="#FF9F1239"
+        android:pathData="M16,10.5 L12,14.5 L12,21.5 L17.5,15.5 Z" />
+
+    <!-- Lower Right Outer Facet -->
+    <path
+        android:fillColor="#FF881337"
+        android:pathData="M21.5,10.5 L16,10.5 L17.5,15.5 Z" />
+
+    <!-- Crisp Facet Wireframe Overlay -->
+    <path
+        android:strokeColor="#50FFFFFF"
+        android:strokeWidth="0.5"
+        android:pathData="M7.5,3.5 L3.5,6.5 L2.5,10.5 L6.5,15.5 L12,21.5 L17.5,15.5 L21.5,10.5 L20.5,6.5 L16.5,3.5 L12,6 Z M7.5,3.5 L8,10.5 L6.5,15.5 M16.5,3.5 L16,10.5 L17.5,15.5 M12,6 L12,8.5 L16,10.5 L12,14.5 L8,10.5 L12,8.5 M12,14.5 L12,21.5" />
+</vector>

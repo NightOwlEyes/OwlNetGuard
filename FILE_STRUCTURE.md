@@ -28,6 +28,10 @@ Tài liệu này mô tả chi tiết cấu trúc thư mục, chức năng của 
 
 ---
 
+
+
+---
+
 ## 📁 gradle/ (Cấu hình hệ thống build / Build System Configuration)
 - **libs.versions.toml**: Danh mục phiên bản tập trung (Version Catalog) quản lý tất cả thư viện Jetpack Compose, Material 3, AndroidX, Kotlin Coroutines.
   *Centralized version catalog managing Jetpack Compose, Material 3, AndroidX, and Kotlin Coroutines dependencies.*
@@ -70,27 +74,32 @@ Tài liệu này mô tả chi tiết cấu trúc thư mục, chức năng của 
   *Signature chamfered crystal shapes (`FacetedCardShape`, `FacetedTileShape`, `FacetedBadgeShape`) for the Faceted Apex visual language.*
 
 #### 📁 ui/components/ (Thành phần giao diện tái sử dụng / Reusable UI Components)
-- **HeaderSection.kt**: Thanh tiêu đề đỉnh màn hình với logo Cú (tự đổi sang đỏ tím khi đang cách ly), chữ "OWL NETGUARD" và menu 3 chấm (`DropdownMenu`).
-  *Top header bar with dynamic Owl logo, title, and 3-dots overflow menu.*
-- **IsolationMasterCard.kt**: Thẻ điều khiển trung tâm Cách ly ứng dụng (Master Switch). Hiển thị số lượng app đang cách ly, trạng thái VPN nền, hiệu ứng viền phát sáng gradient và công tắc bật/tắt chính.
-  *Master isolation control card. Displays isolated count, VPN background status, gradient border glow, and main master switch.*
-- **FloatingHudSettingsCard.kt**: Thẻ cài đặt phím nổi HUD. Hỗ trợ chọn nút hiển thị (Cách ly, Wi-Fi, Dữ liệu, Máy bay), chọn chế độ cô lập ("Tất cả app đã chọn" vs "Chỉ app đang mở"), switch "Tự hủy cách ly khi bật lại mạng" kèm cơ chế tự động làm mờ và khóa chức năng phụ thuộc.
-  *HUD settings card. Manages visible buttons, isolation modes, and the auto-unisolate on reconnect switch with dependency auto-dimming/locking.*
+- **HeaderSection.kt**: Thanh tiêu đề đỉnh màn hình với logo Cú (tự đổi sang đỏ tím khi đang cách ly), chữ "OWL NETGUARD", nút Trái tim kim cương (Ủng hộ nhà phát triển) và menu 3 chấm (`DropdownMenu`).
+  *Top header bar with dynamic Owl logo, title, diamond heart sponsor button, and 3-dots overflow menu.*
+- **IsolationMasterCard.kt**: Thẻ điều khiển trung tâm Cách ly ứng dụng (Master Switch). Hiển thị số lượng app đang cách ly, trạng thái VPN nền, hiệu ứng viền phát sáng gradient và công tắc bật/tắt chính dạng vát góc `FacetedSwitch`.
+  *Master isolation control card. Displays isolated count, VPN background status, gradient border glow, and main faceted switch.*
+- **FloatingHudSettingsCard.kt**: Thẻ cài đặt phím nổi HUD. Hỗ trợ chọn nút hiển thị (Cách ly, Wi-Fi, Dữ liệu, Máy bay), chọn chế độ cô lập ("Tất cả app đã chọn" vs "Chỉ app đang mở"), nút mở danh sách ứng dụng ngoại lệ, switch "Tự hủy cách ly khi bật lại mạng" kèm cơ chế tự động làm mờ và khóa chức năng phụ thuộc.
+  *HUD settings card. Manages visible buttons, isolation modes, overlay excluded apps button, and auto-unisolate on reconnect switch with dependency auto-dimming/locking.*
 - **SelectedAppsSection.kt**: Chứa `SelectedAppsHeaderBar` (thanh tiêu đề danh sách + nút "+ Chọn ứng dụng"), `LoadingStateView` (trạng thái tải app) và `EmptySelectedAppsView` (trạng thái danh sách trống).
   *Contains `SelectedAppsHeaderBar`, `LoadingStateView`, and `EmptySelectedAppsView`.*
-- **SwipeableSelectedAppItem.kt**: Thành phần từng ứng dụng trong danh sách với cử chỉ vuốt ngang xóa (hành trình trên 60% chiều rộng mới xóa), nút lục giác bật/tạm ngưng cách ly và nhãn trạng thái ("ĐÃ KÍCH HOẠT", "ĐANG CÁCH LY", "TẠM NGƯNG").
-  *Individual app item with swipe-to-remove gesture (>60% threshold required), hexagon active/pause toggle button, and status badges.*
+- **SwipeableSelectedAppItem.kt**: Thành phần từng ứng dụng trong danh sách với cử chỉ vuốt ngang xóa (hành trình trên 50% chiều rộng mới xóa, chống chạm lướt nhầm), nút bật/tạm ngưng cách ly và nhãn trạng thái chuẩn ("ĐANG CÁCH LY" vs "ĐANG TẠM DỪNG"), giữ nguyên màu sắc biểu tượng ứng dụng.
+  *Individual app item with swipe-to-remove gesture (>50% threshold required), active/pause toggle button, status badges ("ĐANG CÁCH LY" vs "ĐANG TẠM DỪNG"), and un-grayed app icons.*
+- **FacetedSwitch.kt**: Nút gạt chuyển đổi On/Off vát góc hình học độc bản (`FacetedSwitchTrackShape` & `FacetedSwitchThumbShape`), thay thế hoàn toàn switch tròn của Material 3.
+  *Custom faceted toggle switch with chamfered geometry matching the Faceted Apex design system.*
 - **FacetedAmbientBackground.kt**: Canvas vẽ nền lưới đa giác vát góc lập thể ánh sáng yếu tạo chiều sâu không gian cyberpunk.
   *Canvas-drawn low-poly ambient faceted background mesh creating cyberpunk spatial depth.*
 
 #### 📁 ui/dialogs/ (Hộp thoại tương tác / Interactive Dialogs)
 - **AppPickerDialog.kt**: Hộp thoại chọn ứng dụng toàn diện. Hỗ trợ tìm kiếm theo tên/package theo thời gian thực, lọc ứng dụng hệ thống, tự động co giãn kích thước tỷ lệ vàng khi xoay ngang Landscape.
   *Comprehensive app selection dialog with real-time search, system apps toggle, and responsive landscape sizing.*
+- **ExcludedAppsDialog.kt**: Hộp thoại quản lý danh sách ứng dụng ngoại lệ khi mở đè (Lớp phủ: Messenger, Zalo...) để không ngắt phiên cách ly của ứng dụng tiền trình bên dưới.
+  *Overlay excluded apps dialog allowing user to select apps (chat heads, floating apps) that should not interrupt foreground isolation.*
 - **InfoDialogs.kt**: Tập hợp các hộp thoại thông tin:
   - `UsageAccessPromptDialog`: Hộp thoại hướng dẫn cấp quyền Usage Access cho chế độ Chỉ app đang mở.
   - `PrivacyPolicyDialog`: Chính sách bảo mật (xử lý 100% offline, không thu thập dữ liệu).
   - `OpenSourceLicensesDialog`: Giấy phép mã nguồn mở (GNU General Public License v3.0 - GPL-3.0).
   - `CheckUpdateDialog`: Kiểm tra phiên bản mới từ GitHub Release API.
+  - `DonationDialog`: Hộp thoại ủng hộ nhà phát triển hiển thị mã VietQR (TPBank) và liên kết GitHub Sponsors.
   - `InfoDialogType`: Enum phân loại các hộp thoại.
 
 #### 📁 ui/utils/ (Tiện ích giao diện / UI Utilities)
@@ -102,23 +111,26 @@ Tài liệu này mô tả chi tiết cấu trúc thư mục, chức năng của 
 #### 📁 data/ (Lớp dữ liệu & Lưu trữ / Data & Persistence Layer)
 - **AppInfo.kt**: Lớp dữ liệu mô tả ứng dụng (`name`, `packageName`, `icon`, `isSystemApp`, `isInBubble`, `isBlocked`).
   *Data class representing an application.*
-- **PreferencesManager.kt**: Trình quản lý cài đặt toàn diện (SharedPreferences). Lưu danh sách gói tin, trạng thái kích hoạt, kiểu cô lập, cấu hình phím nổi; hàm `setPackageActive(context, packageName, active)` hỗ trợ kích hoạt/hủy kích hoạt cách ly an toàn; phát luồng phản ứng `stateVersion: StateFlow<Long>` giúp UI và Service đồng bộ tức thì; hàm `syncAllServices()` tự động điều phối kích hoạt/dừng dịch vụ.
-  *Centralized configuration manager (SharedPreferences). Persists app lists, active states (`setPackageActive`), isolation modes, HUD configs; emits reactive `stateVersion` for instant UI/Service sync; provides `syncAllServices()`.*
+- **PreferencesManager.kt**: Trình quản lý cài đặt toàn diện (SharedPreferences). Lưu danh sách gói tin, trạng thái kích hoạt, kiểu cô lập ("Tất cả app đã chọn" vs "Chỉ app đang mở"), biến quản lý app tiền trình `foregroundTunnelPackage`, danh sách ứng dụng ngoại lệ `excludedOverlayPackages`, cấu hình phím nổi; phát luồng phản ứng `stateVersion: StateFlow<Long>` giúp UI và Service đồng bộ tức thì; hàm `syncAllServices()` tự động điều phối kích hoạt/dừng dịch vụ.
+  *Centralized configuration manager (SharedPreferences). Persists app lists, active states, dynamic `foregroundTunnelPackage`, excluded overlay packages, isolation modes, HUD configs; emits reactive `stateVersion` for instant UI/Service sync; provides `syncAllServices()`.*
 
 ---
 
 #### 📁 service/ (Dịch vụ nền hệ thống / System Services Layer)
-- **LocalVpnService.kt**: Trái tim của chế độ cách ly VPN (Sinkhole Architecture). Thiết lập VPN cục bộ qua `VpnService.Builder`, chặn bắt lưu lượng mạng của các ứng dụng bị cô lập, xử lý gói tin âm thầm (drop/trả RST TCP/ICMP unreachable) giúp ứng dụng bị cách ly không crash và không hay biết mạng bị ngắt.
-  *Core VPN isolation engine (Sinkhole Architecture). Creates a local VPN tunnel, intercepts traffic of isolated apps, and handles packets silently so apps do not crash.*
+- **LocalVpnService.kt**: Trái tim của chế độ cách ly VPN (Sinkhole Architecture). Thiết lập đường hầm mạng VPN cục bộ không root: Cấu hình MTU 1500, địa chỉ `10.215.173.1/30` và `fd00:1:fd00:1:fd00:1:fd00:1/128`. Hỗ trợ 2 chế độ cô lập:
+  - **Tất cả app đã chọn**: Đưa toàn bộ app đã chọn vào `addAllowedApplication`, bật/tắt tuyến hố đen `0.0.0.0/1`, `128.0.0.0/1`, `::/1`, `8000::/1` và gán DNS `10.215.173.2`.
+  - **Chỉ app đang mở**: Khi chưa mở app, đường hầm rỗng/đóng; khi mở app trong danh sách, chỉ duy nhất app đó vào đường hầm (`targetPackages = setOf(fgApp)`), duy trì liên tục trong suốt phiên sử dụng để bật/tắt cách ly âm thầm 100% không rớt socket kết nối.
+  *Core local VPN sinkhole engine. Supports both Mode All and dynamic single-app Foreground Mode with silent isolation.*
 - **BubbleService.kt**: Trình điều khiển bong bóng nổi (Floating Bubble WindowManager Overlay).
   - Hai trạng thái: **Thu gọn** (1 bong bóng tròn logo Cú Apex, tự động đổi màu Đỏ thẫm khi app đang mở bị cách ly và màu Tím khi bình thường) và **Mở rộng** (dãy N phím chức năng + phím thứ N+1 là nút Gom lại).
+  - **Cơ chế nhấn 2 lần xác nhận hủy cách ly**: Nhấn lần 1 hiển thị *"Nhấn thêm lần nữa để tạm dừng cách ly"*, chỉ nhấn lần 2 trong vòng 2.5s mới xác nhận mở lại mạng (chống chạm nhầm khi cạnh nút mạng).
   - **Không tự động thu gọn**: Khi bấm vào các phím chức năng (Cách ly, Wi-Fi, Dữ liệu, Máy bay), bong bóng vẫn giữ nguyên trạng thái mở rộng.
   - **Chỉ thu gọn khi bấm đúng phím Gom lại** (Collapse button).
   - Kéo thả mượt mà từ bất kỳ vị trí nào trên bong bóng (nền hay icon), tự động hít sát viền (`snapToNearestEdge`).
   - Tự động làm mờ khi không thao tác sau 3 giây.
   - Nhấn giữ để tắt phím nổi nhanh kèm rung phản hồi.
   - Phím tắt mở bảng cài đặt mạng hệ thống (Wi-Fi, Dữ liệu di động, Chế độ máy bay).
-  - **Tự động hủy cách ly khi bật lại mạng**: Nhận diện thông minh khi toàn bộ kết nối mạng (cả Wi-Fi lẫn Dữ liệu di động) bị ngắt hoàn toàn rồi được bật lại, tự động giải phóng cách ly cho ứng dụng đang dùng (hoặc app duy nhất trong danh sách).
+  - **Tự động hủy cách ly khi bật lại mạng**: Nhận diện thông minh khi toàn bộ kết nối mạng (cả Wi-Fi lẫn Dữ liệu di động) bị ngắt hoàn toàn rồi được bật lại, tự động giải phóng cách ly cho ứng dụng đang dùng.
 - **DraggableBubbleContainer.kt**: Layout tùy chỉnh (`DraggableBubbleContainer`) chặn bắt sự kiện cảm ứng (`onInterceptTouchEvent`), phân biệt chuẩn xác giữa thao tác chạm bấm (Click) và thao tác kéo thả (Drag) từ bất kỳ điểm nào trên giao diện (nền hay phím bấm), hỗ trợ nhấn giữ (Long-press) để tắt HUD.
   *Custom container intercepting touch events, disambiguating taps vs drags from any surface, and handling long-press dismiss.*
 - **QuickTileService.kt**: Dịch vụ ô cài đặt nhanh (Quick Settings Tile) trên thanh trạng thái kéo xuống của Android, cho phép bật/tắt nhanh chế độ cách ly mạng 1 chạm.
@@ -129,22 +141,18 @@ Tài liệu này mô tả chi tiết cấu trúc thư mục, chức năng của 
 #### 📁 receiver/ (Bộ thu phát tín hiệu / Broadcast Receivers)
 - **BootReceiver.kt**: Lắng nghe sự kiện khởi động thiết bị (`BOOT_COMPLETED`), tự động khôi phục VPN và phím nổi nếu người dùng đã bật trước đó.
   *Listens for `BOOT_COMPLETED`, restoring VPN and floating HUD if previously enabled.*
-- **NotificationActionReceiver.kt**: Lắng nghe và xử lý các nút bấm trên thanh thông báo hệ thống: "Bật/Tắt cách ly" và "Tắt phím nổi".
-  *Handles notification action clicks: "Toggle Isolate" and "Turn off Floating HUD".*
+- **NotificationActionReceiver.kt**: Lắng nghe và xử lý các nút bấm trên thanh thông báo hệ thống: "Dừng dịch vụ" (tắt cả VPN lẫn phím nổi) và "Bật/Tắt phím nổi".
+  *Handles notification action clicks: "Stop Service" (stops both VPN & bubble) and "Toggle Floating HUD".*
 
 ---
 
 #### 📁 utils/ (Bộ công cụ & Tiện ích lõi / Core Utilities Layer)
 - **AppListLoader.kt**: Quét danh sách các ứng dụng cài đặt trên thiết bị thông qua `PackageManager`, lọc các ứng dụng có Launcher, loại trừ ứng dụng hiện tại và sắp xếp chữ cái.
   *Scans installed apps via `PackageManager`, filters launcher apps, excludes self, and sorts alphabetically.*
-- **ForegroundAppDetector.kt**: Nhận diện ứng dụng đang hiển thị ở tiền trình (Foreground App) thông qua `UsageStatsManager`, kiểm tra quyền `PACKAGE_USAGE_STATS`. Hỗ trợ `isSystemOrSettingsOrLauncher` và `getLastUserForegroundPackage` giúp xác định chính xác ứng dụng bị cách ly ngay cả khi bảng cài đặt hệ thống hoặc thanh thông báo đang che màn hình.
-  *Detects currently active foreground application via `UsageStatsManager`. Includes `isSystemOrSettingsOrLauncher` and `getLastUserForegroundPackage` to reliably resolve target apps even when system settings overlay is present.*
-- **NetworkSettingsHelper.kt**: Theo dõi trạng thái kết nối mạng (Wi-Fi, Dữ liệu di động, Chế độ máy bay) qua `ConnectivityManager`, `WifiManager`, `ContentObserver` trên `Settings.Global` ("mobile_data", "airplane_mode_on", "wifi_on") và `BroadcastReceiver`, hỗ trợ mở panel cài đặt mạng chuẩn của Android.
-  *Monitors network status (Wi-Fi, Cellular, Airplane mode) via `ConnectivityManager`, `WifiManager`, `Settings.Global` `ContentObserver`, and `BroadcastReceiver`; opens system network panels.*
-- **PacketUtils.kt**: Tiện ích phân tích gói tin IPv4/IPv6 (trích xuất IP nguồn, IP đích, giao thức TCP/UDP/ICMP, cổng port, checksum).
-  *IPv4/IPv6 packet parsing utility (extracts source/dest IPs, TCP/UDP/ICMP protocols, ports, checksums).*
-- **UdpProxyHandler.kt**: Điều hướng và phân tích luồng UDP/DNS nội bộ.
-  *Inspects and routes local UDP/DNS packet streams.*
+- **ForegroundAppDetector.kt**: Nhận diện ứng dụng đang hiển thị ở tiền trình (Foreground App) thông qua `UsageStatsManager`, kiểm tra quyền `PACKAGE_USAGE_STATS`. Hỗ trợ phát hiện Launcher (`isHomeLauncher`), các lớp phủ tạm thời và ứng dụng ngoại lệ (`isTransientOverlayOrSystemOrExcluded`).
+  *Detects currently active foreground application via `UsageStatsManager`. Includes Home launcher detection and transient/excluded overlay detection.*
+- **NetworkSettingsHelper.kt**: Theo dõi trạng thái kết nối mạng (Wi-Fi, Dữ liệu di động, Chế độ máy bay) chuẩn xác qua `TelephonyManager.isDataEnabled` (API 26+), `ConnectivityManager`, `WifiManager`, `ContentObserver` trên `Settings.Global` và `BroadcastReceiver`; hỗ trợ mở panel cài đặt mạng chuẩn của Android.
+  *Monitors network status (Wi-Fi, Cellular, Airplane mode) eliminating false indicators; opens system network panels.*
 
 ---
 

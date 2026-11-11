@@ -14,6 +14,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
+import com.nightowleyes.owlnetguard.BuildConfig
 import com.nightowleyes.owlnetguard.data.PreferencesManager
 import com.nightowleyes.owlnetguard.ui.theme.OwlNetGuardTheme
 import com.nightowleyes.owlnetguard.utils.NetworkSettingsHelper
@@ -106,7 +107,8 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_REQUEST_VPN_PERMISSION = "REQUEST_VPN_PERMISSION"
         const val GITHUB_REPO_URL = "https://github.com/NightOwlEyes/OwlNetGuard"
         const val GITHUB_RELEASES_URL = "https://github.com/NightOwlEyes/OwlNetGuard/releases"
+        const val GITHUB_SPONSORS_URL = "https://github.com/sponsors/NightOwlEyes"
         const val GITHUB_LATEST_API = "https://api.github.com/repos/NightOwlEyes/OwlNetGuard/releases/latest"
-        const val CURRENT_APP_VERSION = "1.0"
+        val CURRENT_APP_VERSION: String = BuildConfig.VERSION_NAME
     }
 }
