@@ -259,11 +259,11 @@ fun cleanReleaseNotes(rawBody: String): String {
     // 1. Loại bỏ các thẻ HTML (như <p>, <img>, <div>, ...)
     cleaned = cleaned.replace(Regex("<[^>]*>", RegexOption.DOT_MATCHES_ALL), " ")
     // 2. Loại bỏ các badge markdown lồng nhau dạng [![...](...)](...)
-    cleaned = cleaned.replace(Regex("\\[\\s*!\\[[^\\]]*\\]\\([^)]*\\)\\s*\\]\\([^)]*\\)"), " ")
+    cleaned = cleaned.replace(Regex("\\[\\s*!\\[[^\\]]*\\]\\([^)]*\\)\\s*\\]\\([^)]*\\)", RegexOption.DOT_MATCHES_ALL), " ")
     // 3. Loại bỏ ảnh markdown standalone: ![alt](url)
-    cleaned = cleaned.replace(Regex("!\\[[^\\]]*\\]\\([^)]*\\)"), " ")
+    cleaned = cleaned.replace(Regex("!\\[[^\\]]*\\]\\([^)]*\\)", RegexOption.DOT_MATCHES_ALL), " ")
     // 4. Đổi link markdown [tên](url) -> tên
-    cleaned = cleaned.replace(Regex("\\[([^\\]]+)\\]\\([^)]*\\)"), "$1")
+    cleaned = cleaned.replace(Regex("\\[([^\\]]+)\\]\\([^)]*\\)", RegexOption.DOT_MATCHES_ALL), "$1")
     // 5. Loại bỏ ký tự in đậm, in nghiêng (**text**, *text*, __text__)
     cleaned = cleaned.replace(Regex("\\*\\*([^*]+)\\*\\*"), "$1")
     cleaned = cleaned.replace(Regex("__([^_]+)__"), "$1")
@@ -425,7 +425,7 @@ fun CheckUpdateDialog(
 
                     Text(statusMessage, fontSize = 12.5.sp, color = TextSecondary)
 
-                    if (releaseNotes.isNotBlank()) {
+                    if (releaseNotes.isNotBlank() && comparison > 0) {
                         Text(
                             text = "Chi tiết cập nhật:",
                             fontSize = 12.5.sp,

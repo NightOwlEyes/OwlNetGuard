@@ -28,8 +28,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nightowleyes.owlnetguard.R
+import com.nightowleyes.owlnetguard.data.PreferencesManager
 import com.nightowleyes.owlnetguard.ui.theme.BrandPrimary
 import com.nightowleyes.owlnetguard.ui.theme.BrandPrimaryDeep
+import com.nightowleyes.owlnetguard.ui.theme.BrandPrimaryLight
 import com.nightowleyes.owlnetguard.ui.theme.CyberCyan
 import com.nightowleyes.owlnetguard.ui.theme.DangerRed
 import com.nightowleyes.owlnetguard.ui.theme.DangerRedMuted
@@ -43,19 +45,57 @@ import com.nightowleyes.owlnetguard.ui.theme.TextSecondary
 @Composable
 fun IsolationMasterCard(
     isVpnEnabled: Boolean,
+    isBubbleOverlayEnabled: Boolean,
+    isolationMode: Int,
     isIsolationActive: Boolean = true,
     activeAppsCount: Int,
     totalSelectedCount: Int,
     onToggleVpn: (Boolean) -> Unit
 ) {
-    val isEffectivelyActive = isVpnEnabled && isIsolationActive
-    val accentColor = if (isEffectivelyActive) DangerRed else BrandPrimary
-    val borderBrush = remember(isEffectivelyActive) {
-        if (isEffectivelyActive) {
-            Brush.linearGradient(listOf(Color.White.copy(alpha = 0.85f), DangerRed, BrandPrimaryDeep))
-        } else {
-            Brush.linearGradient(listOf(BrandPrimary.copy(alpha = 0.7f), CyberCyan.copy(alpha = 0.5f)))
+    // Xác định trạng thái (1) Violet (Đang tạm dừng cách ly) hay (2) Scarlet (Đang cách ly X/Y ứng dụng)
+    val isState2: Boolean = when {
+        !isVpnEnabled -> false
+        !isBubbleOverlayEnabled -> {
+            // Phím nổi: Tắt
+            // - Nếu: "Ứng dụng đã chọn" toàn bộ "Đang tạm dừng" -> (1)
+            // - Nếu: "Ứng dụng đã chọn" một hoặc toàn bộ "Đang cách ly" -> (2)
+            activeAppsCount > 0
         }
+        isolationMode == PreferencesManager.ISOLATION_MODE_FOREGROUND -> {
+            // Phím nổi: Bật | Mode: "Chỉ app đang mở"
+            // - Nếu đang ở trong app hoặc trên các ứng dụng không có trong danh sách -> (1)
+            // - Nếu ở trong app có trong danh sách -> (2)
+            activeAppsCount > 0
+        }
+        else -> {
+            // Phím nổi: Bật | Mode: "Tất cả app đã chọn"
+            // Bấm vào một ứng dụng thì toàn bộ app chuyển thành "Đang tạm dừng" -> (1) / "Đang cách ly" -> (2)
+            // Bấm vào phím nổi thì toàn bộ app chuyển thành "Đang tạm dừng" -> (1) / "Đang cách ly" -> (2)
+            activeAppsCount > 0 && isIsolationActive
+        }
+    }
+
+    val accentColor = when {
+        !isVpnEnabled -> BrandPrimary
+        isState2 -> DangerRed // (2) Scarlet
+        else -> BrandPrimary // (1) Violet
+    }
+
+    val borderBrush = remember(isVpnEnabled, isState2) {
+        when {
+            !isVpnEnabled ->
+                Brush.linearGradient(listOf(BrandPrimary.copy(alpha = 0.5f), CyberCyan.copy(alpha = 0.3f)))
+            isState2 ->
+                Brush.linearGradient(listOf(Color.White.copy(alpha = 0.85f), DangerRed, BrandPrimaryDeep))
+            else ->
+                Brush.linearGradient(listOf(BrandPrimary.copy(alpha = 0.9f), BrandPrimaryDeep, CyberCyan.copy(alpha = 0.45f)))
+        }
+    }
+
+    val containerColor = when {
+        !isVpnEnabled -> SlateSurface
+        isState2 -> DangerRedMuted.copy(alpha = 0.45f)
+        else -> Color(0xFF1E1338).copy(alpha = 0.70f) // Deep Violet
     }
 
     Card(
@@ -63,9 +103,7 @@ fun IsolationMasterCard(
             .fillMaxWidth()
             .padding(horizontal = 14.dp, vertical = 4.dp),
         shape = FacetedCardShape,
-        colors = CardDefaults.cardColors(
-            containerColor = if (isEffectivelyActive) DangerRedMuted.copy(alpha = 0.45f) else SlateSurface
-        ),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
         border = CardDefaults.outlinedCardBorder().copy(width = 1.2.dp, brush = borderBrush)
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
@@ -79,14 +117,21 @@ fun IsolationMasterCard(
                     lineTo(w * 0.85f, h * 0.35f)
                     close()
                 }
-                drawPath(p1, if (isEffectivelyActive) DangerRed.copy(alpha = 0.08f) else BrandPrimary.copy(alpha = 0.08f))
+                drawPath(
+                    p1,
+                    when {
+                        !isVpnEnabled -> BrandPrimary.copy(alpha = 0.05f)
+                        isState2 -> DangerRed.copy(alpha = 0.08f)
+                        else -> BrandPrimary.copy(alpha = 0.09f)
+                    }
+                )
 
                 drawLine(
                     brush = Brush.horizontalGradient(
-                        if (isEffectivelyActive) {
-                            listOf(Color.White.copy(alpha = 0.6f), DangerRed.copy(alpha = 0.4f), Color.Transparent)
-                        } else {
-                            listOf(Color.White.copy(alpha = 0.5f), BrandPrimary.copy(alpha = 0.3f), Color.Transparent)
+                        when {
+                            !isVpnEnabled -> listOf(BrandPrimary.copy(alpha = 0.3f), Color.Transparent)
+                            isState2 -> listOf(Color.White.copy(alpha = 0.6f), DangerRed.copy(alpha = 0.4f), Color.Transparent)
+                            else -> listOf(Color.White.copy(alpha = 0.5f), BrandPrimary.copy(alpha = 0.4f), Color.Transparent)
                         }
                     ),
                     start = Offset(0f, 1.5f),
@@ -112,7 +157,7 @@ fun IsolationMasterCard(
                     ) {
                         Image(
                             painter = painterResource(
-                                id = if (isEffectivelyActive) R.drawable.logo_faceted_apex_isolated else R.drawable.logo_faceted_apex
+                                id = if (isVpnEnabled && isState2) R.drawable.logo_faceted_apex_isolated else R.drawable.logo_faceted_apex
                             ),
                             contentDescription = null,
                             contentScale = ContentScale.Fit,
@@ -122,7 +167,7 @@ fun IsolationMasterCard(
                         Column {
                             Text(
                                 text = "Cách ly ứng dụng",
-                                color = if (isEffectivelyActive) Color.White else TextPrimary,
+                                color = if (isVpnEnabled) Color.White else TextPrimary,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.ExtraBold
                             )
@@ -130,14 +175,16 @@ fun IsolationMasterCard(
                                 text = when {
                                     !isVpnEnabled ->
                                         "Duy trì kết nối mạng VPN để cách ly ứng dụng đã chọn"
-                                    !isIsolationActive ->
-                                        "Tạm dừng cách ly (VPN nền đang bật)\nChạm phím nổi để kích hoạt lại"
-                                    activeAppsCount > 0 ->
-                                        "Đang cách ly $activeAppsCount/$totalSelectedCount ứng dụng\nVPN nền đang bật"
+                                    isState2 ->
+                                        "VPN nền đang bật\nĐang cách ly $activeAppsCount/$totalSelectedCount ứng dụng"
                                     else ->
-                                        "Sẵn sàng (chưa chọn ứng dụng)\nVPN nền đang bật"
+                                        "VPN nền đang bật\nĐang tạm dừng cách ly"
                                 },
-                                color = if (isEffectivelyActive) DangerRed else if (isVpnEnabled) CyberCyan else TextSecondary,
+                                color = when {
+                                    !isVpnEnabled -> TextSecondary
+                                    isState2 -> DangerRed
+                                    else -> BrandPrimaryLight
+                                },
                                 fontSize = 11.sp
                             )
                         }

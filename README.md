@@ -10,14 +10,14 @@
 
 <p align="center">
   <a href="https://github.com/NightOwlEyes/OwlNetGuard/releases/latest">
-    <img src="https://img.shields.io/badge/Release-v1.1-8A2BE2?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.1" />
+    <img src="https://img.shields.io/badge/Release-v1.2-8A2BE2?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.2" />
   </a>
   <a href="https://github.com/NightOwlEyes/OwlNetGuard/releases/latest">
     <img src="https://img.shields.io/badge/Download-APK-00E5FF?style=for-the-badge&logo=google-play&logoColor=black" alt="Tải về APK" />
   </a>
   <img src="https://img.shields.io/badge/Android-8.0%2B-blueviolet?style=for-the-badge&logo=android" alt="Android 8.0+" />
   <img src="https://img.shields.io/badge/Play_Protect-100%25_Compliant-success?style=for-the-badge&logo=googleplay" alt="Play Protect Safe" />
-  <a href="https://www.virustotal.com/gui/file/479c0bc4db074c4ce8c2cc77010e2637bc7a2286fc45084c3147a49ff97f3b68">
+  <a href="https://www.virustotal.com/gui/file/1a3c07b2bfe41cff5960704d9e199a2c0a1192a7348639f5d35de2aaa4a5b229">
     <img src="https://img.shields.io/badge/VirusTotal-Clean%20(0%2F71)-brightgreen?style=for-the-badge&logo=virustotal" alt="VirusTotal Clean" />
   </a>
   <a href="LICENSE">
@@ -116,7 +116,7 @@ cd OwlNetGuard
 .\gradlew.bat assembleRelease
 ```
 
-File APK xuất xưởng sẽ nằm tại:
+File APK sẽ nằm tại:
 `app/build/outputs/apk/release/app-release.apk`
 
 ---
@@ -124,7 +124,7 @@ File APK xuất xưởng sẽ nằm tại:
 ## 🛡️ Kiểm định an toàn & VirusTotal
 
 OwlNetGuard hoàn toàn sạch mã độc, đạt chuẩn an toàn 100%:
-* 🟢 **Báo cáo VirusTotal**: [0/68 Nhà cung cấp bảo mật phát hiện - Clean 100%](https://www.virustotal.com/gui/file/479c0bc4db074c4ce8c2cc77010e2637bc7a2286fc45084c3147a49ff97f3b68)
+* 🟢 **Báo cáo VirusTotal**: [0/68 Nhà cung cấp bảo mật phát hiện - Clean 100%](https://www.virustotal.com/gui/file/1a3c07b2bfe41cff5960704d9e199a2c0a1192a7348639f5d35de2aaa4a5b229)
 * 🟢 **Google Play Protect**: Tuân thủ 100% tiêu chuẩn bảo mật của Android, hoạt động hoàn toàn offline không thu thập dữ liệu người dùng.
 
 ---

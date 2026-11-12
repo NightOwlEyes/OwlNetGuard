@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 
 object PreferencesManager {
     private const val PREFS_NAME = "owl_netguard_prefs"
-    private const val KEY_DEFAULTS_INIT = "defaults_initialized_v8"
+    private const val KEY_DEFAULTS_INIT = "defaults_initialized_v9"
     private const val KEY_VPN_ENABLED = "vpn_background_enabled"
     private const val KEY_ISOLATION_ACTIVE = "app_isolation_active"
     private const val KEY_SHOW_BUBBLE = "show_floating_bubble"
@@ -26,6 +26,7 @@ object PreferencesManager {
     private const val KEY_AUTO_UNISOLATE_ON_RECONNECT = "auto_unisolate_on_reconnect"
     private const val KEY_BUBBLE_PACKAGES = "bubble_packages"
     private const val KEY_ACTIVE_PACKAGES = "active_bubble_packages"
+    private const val KEY_SAVED_USER_ACTIVE_PACKAGES = "saved_user_active_packages"
     private const val KEY_ISOLATION_MODE = "isolation_mode"
     private const val KEY_EXCLUDED_OVERLAY_PACKAGES = "excluded_overlay_packages"
 
@@ -56,6 +57,9 @@ object PreferencesManager {
             sp.edit {
                 putStringSet(KEY_BUBBLE_PACKAGES, existingBubble)
                 putStringSet(KEY_ACTIVE_PACKAGES, existingActive)
+                if (!sp.contains(KEY_SAVED_USER_ACTIVE_PACKAGES)) {
+                    putStringSet(KEY_SAVED_USER_ACTIVE_PACKAGES, existingActive)
+                }
                 putBoolean(KEY_VPN_ENABLED, sp.getBoolean(KEY_VPN_ENABLED, false))
                 putBoolean(KEY_ISOLATION_ACTIVE, sp.getBoolean(KEY_ISOLATION_ACTIVE, true))
                 putBoolean(KEY_SHOW_BUBBLE, sp.getBoolean(KEY_SHOW_BUBBLE, false))
@@ -87,10 +91,18 @@ object PreferencesManager {
         if (!enabled) {
             foregroundTunnelPackage = null
         }
-        prefs(context).edit {
+        val sp = prefs(context)
+        val isBubbleOn = sp.getBoolean(KEY_SHOW_BUBBLE, false)
+        sp.edit {
             putBoolean(KEY_VPN_ENABLED, enabled)
             if (enabled) {
                 putBoolean(KEY_ISOLATION_ACTIVE, true)
+                // Khi bật lại Cách ly ứng dụng và Phím nổi TẮT:
+                // Đảm bảo khôi phục chính xác cấu hình từng app người dùng đã lưu
+                if (!isBubbleOn) {
+                    val restored = getSavedUserActivePackages(context)
+                    putStringSet(KEY_ACTIVE_PACKAGES, LinkedHashSet(restored))
+                }
             }
         }
         syncIsolation(context)
@@ -106,15 +118,15 @@ object PreferencesManager {
 
     fun setAppIsolationActive(context: Context, active: Boolean) {
         if (!isVpnEnabled(context)) return
-        val currentActive = getActivePackages(context)
-        val bubble = getBubblePackages(context)
-        prefs(context).edit {
-            putBoolean(KEY_ISOLATION_ACTIVE, active)
-            if (active && currentActive.isEmpty() && bubble.isNotEmpty()) {
-                putStringSet(KEY_ACTIVE_PACKAGES, LinkedHashSet(bubble))
+        val currentMode = getIsolationMode(context)
+        if (currentMode == ISOLATION_MODE_ALL) {
+            setAllPackagesActive(context, active)
+        } else {
+            prefs(context).edit {
+                putBoolean(KEY_ISOLATION_ACTIVE, active)
             }
+            syncIsolation(context)
         }
-        syncIsolation(context)
     }
 
     fun toggleAppIsolationActive(context: Context): Boolean {
@@ -135,12 +147,37 @@ object PreferencesManager {
     }
 
     fun setBubbleOverlayEnabled(context: Context, enabled: Boolean) {
-        prefs(context).edit {
+        val sp = prefs(context)
+        val currentMode = getIsolationMode(context)
+        val bubble = getBubblePackages(context)
+
+        sp.edit {
             putBoolean(KEY_SHOW_BUBBLE, enabled)
-            if (!enabled && getIsolationMode(context) == ISOLATION_MODE_FOREGROUND) {
-                putInt(KEY_ISOLATION_MODE, ISOLATION_MODE_ALL)
-                val bubble = getBubblePackages(context)
-                putStringSet(KEY_ACTIVE_PACKAGES, LinkedHashSet(bubble))
+            if (enabled) {
+                // Khi BẬT Phím nổi (HUD):
+                // 1. Lưu lại cấu hình từng app người dùng đang đặt hiện tại
+                val currentActive = getSavedUserActivePackages(context)
+                putStringSet(KEY_SAVED_USER_ACTIVE_PACKAGES, LinkedHashSet(currentActive))
+
+                // 2. Chuyển trạng thái ứng dụng theo chế độ:
+                if (currentMode == ISOLATION_MODE_ALL) {
+                    // Mode: "Tất cả app đã chọn" -> Toàn bộ "Ứng dụng đã chọn" chuyển thành đang cách ly
+                    putStringSet(KEY_ACTIVE_PACKAGES, LinkedHashSet(bubble))
+                    putBoolean(KEY_ISOLATION_ACTIVE, true)
+                } else {
+                    // Mode: "Chỉ app đang mở" -> Toàn bộ "Ứng dụng đã chọn" chuyển thành đang tạm dừng
+                    putStringSet(KEY_ACTIVE_PACKAGES, emptySet())
+                    putBoolean(KEY_ISOLATION_ACTIVE, true)
+                }
+            } else {
+                // Khi TẮT Phím nổi (HUD):
+                // Load lại cấu hình đã lưu
+                if (currentMode == ISOLATION_MODE_FOREGROUND) {
+                    putInt(KEY_ISOLATION_MODE, ISOLATION_MODE_ALL)
+                }
+                val restored = getSavedUserActivePackages(context)
+                putStringSet(KEY_ACTIVE_PACKAGES, LinkedHashSet(restored))
+                putBoolean(KEY_ISOLATION_ACTIVE, restored.isNotEmpty())
             }
         }
         if (!enabled) {
@@ -222,18 +259,35 @@ object PreferencesManager {
         prefs(context).getInt(KEY_ISOLATION_MODE, ISOLATION_MODE_ALL)
 
     fun setIsolationMode(context: Context, mode: Int) {
-        prefs(context).edit {
+        val currentMode = getIsolationMode(context)
+        if (currentMode == mode) return
+
+        val sp = prefs(context)
+        val bubble = getBubblePackages(context)
+        val isBubbleOn = isBubbleOverlayEnabled(context)
+
+        sp.edit {
             putInt(KEY_ISOLATION_MODE, mode)
             if (mode == ISOLATION_MODE_FOREGROUND) {
                 // Chế độ 'Chỉ app đang mở': tất cả các app chuyển về trạng thái 'Đang tạm dừng'
-                // Khi chuyển qua chỉ app đang mở thì không có app nào được đưa vào đường hầm mạng cả
+                if (!isBubbleOn) {
+                    val currentActive = getActivePackages(context)
+                    putStringSet(KEY_SAVED_USER_ACTIVE_PACKAGES, LinkedHashSet(currentActive))
+                }
                 putStringSet(KEY_ACTIVE_PACKAGES, emptySet())
                 putBoolean(KEY_ISOLATION_ACTIVE, true)
             } else {
-                // Chế độ 'Tất cả app đã chọn': tất cả app trong danh sách chuyển sang 'Đang cách ly'
-                val bubble = getBubblePackages(context)
-                putStringSet(KEY_ACTIVE_PACKAGES, LinkedHashSet(bubble))
-                putBoolean(KEY_ISOLATION_ACTIVE, true)
+                // Chuyển lại về 'Tất cả app đã chọn':
+                if (isBubbleOn) {
+                    // Khi Phím nổi đang BẬT: Toàn bộ "Ứng dụng đã chọn" chuyển thành đang cách ly
+                    putStringSet(KEY_ACTIVE_PACKAGES, LinkedHashSet(bubble))
+                    putBoolean(KEY_ISOLATION_ACTIVE, true)
+                } else {
+                    // Khi Phím nổi TẮT: Khôi phục cấu hình người dùng đã đặt cho từng app
+                    val restored = getSavedUserActivePackages(context)
+                    putStringSet(KEY_ACTIVE_PACKAGES, LinkedHashSet(restored))
+                    putBoolean(KEY_ISOLATION_ACTIVE, restored.isNotEmpty())
+                }
             }
         }
         foregroundTunnelPackage = null
@@ -297,6 +351,23 @@ object PreferencesManager {
         return active.filterTo(LinkedHashSet()) { bubble.contains(it) }
     }
 
+    fun getSavedUserActivePackages(context: Context): Set<String> {
+        val sp = prefs(context)
+        val bubble = getBubblePackages(context)
+        val saved = sp.getStringSet(KEY_SAVED_USER_ACTIVE_PACKAGES, null)
+        if (saved != null) {
+            return saved.filterTo(LinkedHashSet()) { bubble.contains(it) }
+        }
+        val currentActive = sp.getStringSet(KEY_ACTIVE_PACKAGES, null)
+        val initial = if (currentActive != null) {
+            currentActive.filterTo(LinkedHashSet()) { bubble.contains(it) }
+        } else {
+            bubble
+        }
+        sp.edit { putStringSet(KEY_SAVED_USER_ACTIVE_PACKAGES, initial) }
+        return initial
+    }
+
     fun pruneUninstalledPackages(context: Context, installedPackages: Set<String>) {
         val currentBubble = LinkedHashSet(getBubblePackages(context))
         val currentActive = LinkedHashSet(getActivePackages(context))
@@ -336,20 +407,40 @@ object PreferencesManager {
         val sp = prefs(context)
         val currentBubble = LinkedHashSet(getBubblePackages(context))
         val currentActive = LinkedHashSet(getActivePackages(context))
+        val isBubbleOn = isBubbleOverlayEnabled(context)
+        val mode = getIsolationMode(context)
+        val isFgMode = isBubbleOn && mode == ISOLATION_MODE_FOREGROUND
         val added: Boolean
+
+        val savedActive = LinkedHashSet(getSavedUserActivePackages(context))
+
         if (currentBubble.contains(packageName)) {
             currentBubble.remove(packageName)
             currentActive.remove(packageName)
+            savedActive.remove(packageName)
             added = false
         } else {
             currentBubble.add(packageName)
-            currentActive.add(packageName)
+            if (isFgMode) {
+                // Chế độ 'Chỉ app đang mở': khi thêm app mới vào danh sách, app ở trạng thái "Đang tạm dừng"
+                currentActive.remove(packageName)
+                savedActive.add(packageName)
+            } else if (isBubbleOn) {
+                // Phím nổi đang BẬT: app mới thêm vào thành "Đang cách ly"
+                currentActive.add(packageName)
+                savedActive.add(packageName)
+            } else {
+                // Phím nổi TẮT: app mới thêm mặc định "Đang cách ly"
+                currentActive.add(packageName)
+                savedActive.add(packageName)
+            }
             added = true
         }
 
         sp.edit {
             putStringSet(KEY_BUBBLE_PACKAGES, currentBubble)
             putStringSet(KEY_ACTIVE_PACKAGES, currentActive)
+            putStringSet(KEY_SAVED_USER_ACTIVE_PACKAGES, savedActive)
         }
 
         syncIsolation(context)
@@ -360,11 +451,15 @@ object PreferencesManager {
         val sp = prefs(context)
         val currentBubble = LinkedHashSet(getBubblePackages(context))
         val currentActive = LinkedHashSet(getActivePackages(context))
+        val savedActive = LinkedHashSet(getSavedUserActivePackages(context))
+
         if (currentBubble.remove(packageName)) {
             currentActive.remove(packageName)
+            savedActive.remove(packageName)
             sp.edit {
                 putStringSet(KEY_BUBBLE_PACKAGES, currentBubble)
                 putStringSet(KEY_ACTIVE_PACKAGES, currentActive)
+                putStringSet(KEY_SAVED_USER_ACTIVE_PACKAGES, savedActive)
             }
             syncIsolation(context)
         }
@@ -385,8 +480,13 @@ object PreferencesManager {
             nowActive = true
         }
 
+        val isBubbleOn = isBubbleOverlayEnabled(context)
         sp.edit {
             putStringSet(KEY_ACTIVE_PACKAGES, currentActive)
+            // Chỉ cập nhật cấu hình đã lưu khi Phím nổi TẮT
+            if (!isBubbleOn) {
+                putStringSet(KEY_SAVED_USER_ACTIVE_PACKAGES, currentActive)
+            }
             if (nowActive || currentActive.isNotEmpty()) {
                 putBoolean(KEY_ISOLATION_ACTIVE, true)
             }
@@ -394,6 +494,16 @@ object PreferencesManager {
 
         syncIsolation(context)
         return nowActive
+    }
+
+    fun setAllPackagesActive(context: Context, active: Boolean) {
+        val bubble = getBubblePackages(context)
+        val newActive = if (active) LinkedHashSet(bubble) else LinkedHashSet<String>()
+        prefs(context).edit {
+            putStringSet(KEY_ACTIVE_PACKAGES, newActive)
+            putBoolean(KEY_ISOLATION_ACTIVE, active)
+        }
+        syncIsolation(context)
     }
 
     fun setPackageActive(context: Context, packageName: String, active: Boolean) {
@@ -404,8 +514,13 @@ object PreferencesManager {
         val currentActive = LinkedHashSet(getActivePackages(context))
         val changed = if (active) currentActive.add(packageName) else currentActive.remove(packageName)
         if (changed) {
+            val isBubbleOn = isBubbleOverlayEnabled(context)
             sp.edit {
                 putStringSet(KEY_ACTIVE_PACKAGES, currentActive)
+                // Chỉ cập nhật cấu hình đã lưu khi Phím nổi TẮT
+                if (!isBubbleOn) {
+                    putStringSet(KEY_SAVED_USER_ACTIVE_PACKAGES, currentActive)
+                }
                 if (active || currentActive.isNotEmpty()) {
                     putBoolean(KEY_ISOLATION_ACTIVE, true)
                 }

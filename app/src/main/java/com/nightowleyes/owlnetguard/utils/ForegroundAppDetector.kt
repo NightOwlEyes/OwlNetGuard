@@ -62,7 +62,7 @@ object ForegroundAppDetector {
         }
         return try {
             val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
-                ?: return lastKnownForegroundPackage
+                ?: return lastKnownForegroundPackage?.takeIf { !isTransientOverlayOrSystemOrExcluded(context, it) }
             val now = System.currentTimeMillis()
             // First check recent 3 minutes
             var events = usm.queryEvents(now - 180_000L, now)
@@ -77,8 +77,9 @@ object ForegroundAppDetector {
                     val cls = event.className ?: ""
                     val isSettingsPanel = pkg?.contains("settings", ignoreCase = true) == true &&
                         cls.contains("panel", ignoreCase = true)
+                    val isExcludedOrTransient = isTransientOverlayOrSystemOrExcluded(context, pkg)
                     if (!pkg.isNullOrBlank() &&
-                        pkg != "com.android.systemui" &&
+                        !isExcludedOrTransient &&
                         !isSettingsPanel &&
                         event.timeStamp >= latestTime
                     ) {
@@ -102,8 +103,9 @@ object ForegroundAppDetector {
                     val cls = event.className ?: ""
                     val isSettingsPanel = pkg?.contains("settings", ignoreCase = true) == true &&
                         cls.contains("panel", ignoreCase = true)
+                    val isExcludedOrTransient = isTransientOverlayOrSystemOrExcluded(context, pkg)
                     if (!pkg.isNullOrBlank() &&
-                        pkg != "com.android.systemui" &&
+                        !isExcludedOrTransient &&
                         !isSettingsPanel &&
                         event.timeStamp >= latestTime
                     ) {
@@ -121,7 +123,8 @@ object ForegroundAppDetector {
             val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, now - 86_400_000L, now)
             val mostRecent = stats
                 ?.filter {
-                    it.packageName != "com.android.systemui" &&
+                    !it.packageName.isNullOrBlank() &&
+                        !isTransientOverlayOrSystemOrExcluded(context, it.packageName) &&
                         it.lastTimeUsed > 0L
                 }
                 ?.maxByOrNull { it.lastTimeUsed }
@@ -129,9 +132,9 @@ object ForegroundAppDetector {
             if (mostRecent != null) {
                 lastKnownForegroundPackage = mostRecent.packageName
             }
-            lastKnownForegroundPackage
+            lastKnownForegroundPackage?.takeIf { !isTransientOverlayOrSystemOrExcluded(context, it) }
         } catch (_: Exception) {
-            lastKnownForegroundPackage
+            lastKnownForegroundPackage?.takeIf { !isTransientOverlayOrSystemOrExcluded(context, it) }
         }
     }
 

@@ -222,7 +222,7 @@ fun MainScreen(
             ) {
                 // Header Bar with Exact Faceted Apex Owl Logo + Info Menu
                 HeaderSection(
-                    isIsolated = isVpnEnabled && isBubbleIsolated,
+                    isIsolated = isVpnEnabled && activeSelectedCount > 0 && isBubbleIsolated,
                     showInfoMenu = showInfoMenu,
                     onToggleInfoMenu = { showInfoMenu = !showInfoMenu },
                     onDismissInfoMenu = { showInfoMenu = false },
@@ -240,6 +240,8 @@ fun MainScreen(
                     // 1. Top Section: Cách ly ứng dụng
                     IsolationMasterCard(
                         isVpnEnabled = isVpnEnabled,
+                        isBubbleOverlayEnabled = isBubbleOverlayEnabled,
+                        isolationMode = isolationMode,
                         isIsolationActive = isBubbleIsolated,
                         activeAppsCount = activeSelectedCount,
                         totalSelectedCount = selectedApps.size,
@@ -248,9 +250,7 @@ fun MainScreen(
                                 onRequestVpnPermission()
                             } else {
                                 PreferencesManager.setVpnEnabled(context, enabled)
-                                if (enabled) {
-                                    PreferencesManager.setAppIsolationActive(context, true)
-                                } else {
+                                if (!enabled) {
                                     // Tự động làm mờ/tắt Phím nổi khi tắt Cách ly ứng dụng
                                     PreferencesManager.setBubbleOverlayEnabled(context, false)
                                 }
@@ -308,6 +308,28 @@ fun MainScreen(
                     )
                 }
 
+                val handleToggleAppActive: (AppInfo) -> Unit = { app ->
+                    if (isolationMode == PreferencesManager.ISOLATION_MODE_FOREGROUND) {
+                        Toast.makeText(
+                            context,
+                            "Chế độ 'Chỉ app đang mở': Ứng dụng sẽ tự động cách ly khi bạn mở ứng dụng đó lên màn hình.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } else if (isBubbleOverlayEnabled) {
+                        // Mode "Tất cả app đã chọn" khi Phím nổi BẬT:
+                        // Bấm vào một ứng dụng thì toàn bộ app chuyển thành "Đang tạm dừng" -> (1) / "Đang cách ly" -> (2)
+                        val currentActive = PreferencesManager.getActivePackages(context)
+                        if (currentActive.isNotEmpty()) {
+                            PreferencesManager.setAllPackagesActive(context, false)
+                        } else {
+                            PreferencesManager.setAllPackagesActive(context, true)
+                        }
+                    } else {
+                        // Phím nổi TẮT: Tùy chỉnh bật/tắt từng ứng dụng độc lập
+                        PreferencesManager.togglePackageActive(context, app.packageName)
+                    }
+                }
+
                 val appsContent: @Composable (Modifier) -> Unit = { paneModifier ->
                     Column(modifier = paneModifier) {
                         // Unified Header: "Ứng dụng đã chọn" + Button "Chọn ứng dụng"
@@ -344,20 +366,7 @@ fun MainScreen(
                                             SwipeableSelectedAppItem(
                                                 app = app,
                                                 isVpnIsolated = isVpnEnabled && isBubbleIsolated,
-                                                onToggleActive = {
-                                                    if (isolationMode == PreferencesManager.ISOLATION_MODE_FOREGROUND) {
-                                                        Toast.makeText(
-                                                            context,
-                                                            "Chế độ 'Chỉ app đang mở': Ứng dụng sẽ tự động cách ly khi bạn mở ứng dụng đó lên màn hình.",
-                                                            Toast.LENGTH_SHORT
-                                                        ).show()
-                                                    } else {
-                                                        PreferencesManager.togglePackageActive(
-                                                            context,
-                                                            app.packageName
-                                                        )
-                                                    }
-                                                },
+                                                onToggleActive = { handleToggleAppActive(app) },
                                                 onRemoveFromList = {
                                                     PreferencesManager.removePackageFromBubble(
                                                         context,
@@ -431,20 +440,7 @@ fun MainScreen(
                                         SwipeableSelectedAppItem(
                                             app = app,
                                             isVpnIsolated = isVpnEnabled && isBubbleIsolated,
-                                            onToggleActive = {
-                                                if (isolationMode == PreferencesManager.ISOLATION_MODE_FOREGROUND) {
-                                                    Toast.makeText(
-                                                        context,
-                                                        "Chế độ 'Chỉ app đang mở': Ứng dụng sẽ tự động cách ly khi bạn mở ứng dụng đó lên màn hình.",
-                                                        Toast.LENGTH_SHORT
-                                                    ).show()
-                                                } else {
-                                                    PreferencesManager.togglePackageActive(
-                                                        context,
-                                                        app.packageName
-                                                    )
-                                                }
-                                            },
+                                            onToggleActive = { handleToggleAppActive(app) },
                                             onRemoveFromList = {
                                                 PreferencesManager.removePackageFromBubble(
                                                     context,

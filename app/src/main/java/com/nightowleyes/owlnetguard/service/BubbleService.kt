@@ -317,8 +317,15 @@ class BubbleService : Service() {
         imgActionCollapse = view.findViewById(R.id.imgActionCollapse)
 
         // Tapping the single collapsed bubble expands into the action bar
+        // (Hoặc nếu chỉ tích chọn mục cách ly thôi thì kích hoạt hành động cách ly luôn)
         cardCollapsedBubble?.setOnClickListener {
-            expandBubble()
+            val otherActions = getEnabledActions().filter { it != ActionType.ISOLATE }
+            if (otherActions.isEmpty()) {
+                executeAction(ActionType.ISOLATE)
+                scheduleIdleFade()
+            } else {
+                expandBubble()
+            }
         }
 
         // Action buttons: execute action and DO NOT collapse!
@@ -405,6 +412,14 @@ class BubbleService : Service() {
     }
 
     private fun expandBubble() {
+        val otherActions = getEnabledActions().filter { it != ActionType.ISOLATE }
+        if (otherActions.isEmpty()) {
+            // Nếu chỉ tích chọn mục cách ly thì không cần hiện nút thu gọn và không cần bung thanh panel
+            executeAction(ActionType.ISOLATE)
+            scheduleIdleFade()
+            return
+        }
+
         isExpanded = true
         cardCollapsedBubble?.visibility = View.GONE
         panelExpanded?.visibility = View.VISIBLE
@@ -574,7 +589,7 @@ class BubbleService : Service() {
                         return
                     }
 
-                    val isCurrentlyIsolated = PreferencesManager.isAppIsolationActive(this) && activeApps.isNotEmpty()
+                    val isCurrentlyIsolated = activeApps.isNotEmpty()
                     if (isCurrentlyIsolated) {
                         // Chế độ tất cả app: hủy cách ly cũng yêu cầu nhấn 2 lần
                         val now = System.currentTimeMillis()
@@ -588,18 +603,16 @@ class BubbleService : Service() {
                             return
                         }
                         lastUnisolateConfirmTimestamp = 0L
+                        // Chuyển toàn bộ app sang "Đang tạm dừng"
+                        PreferencesManager.setAllPackagesActive(this, false)
+                        Toast.makeText(this, "Đã tạm dừng cách ly tất cả ứng dụng", Toast.LENGTH_SHORT).show()
                     } else {
                         lastUnisolateConfirmTimestamp = 0L
+                        // Chuyển toàn bộ app sang "Đang cách ly"
+                        PreferencesManager.setAllPackagesActive(this, true)
+                        val updatedActiveCount = PreferencesManager.getActivePackages(this).size
+                        Toast.makeText(this, "Đang cách ly mạng $updatedActiveCount ứng dụng đã chọn", Toast.LENGTH_SHORT).show()
                     }
-
-                    val isolated = PreferencesManager.toggleAppIsolationActive(this)
-                    val updatedActiveCount = PreferencesManager.getEffectiveBlockedPackages(this).size
-                    val msg = if (isolated) {
-                        "Đang cách ly mạng $updatedActiveCount ứng dụng đã chọn"
-                    } else {
-                        "Đã tạm dừng cách ly tất cả ứng dụng"
-                    }
-                    Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
                 }
                 updateQuickBallState()
             }
@@ -765,8 +778,13 @@ class BubbleService : Service() {
         updateNetworkViews(netStatus)
 
         val enabledActions = getEnabledActions()
+        val otherActions = enabledActions.filter { it != ActionType.ISOLATE }
         btnActionIsolate?.visibility =
             if (enabledActions.contains(ActionType.ISOLATE)) View.VISIBLE else View.GONE
+
+        if (otherActions.isEmpty()) {
+            isExpanded = false
+        }
 
         // Switch collapsed / expanded views
         if (isExpanded) {
@@ -777,8 +795,8 @@ class BubbleService : Service() {
             panelExpanded?.visibility = View.GONE
         }
 
-        // Dedicated Collapse button is always present in expanded state
-        btnActionCollapse?.visibility = View.VISIBLE
+        // Nếu chỉ tích chọn mục cách ly thôi thì không cần hiện nút thu gọn
+        btnActionCollapse?.visibility = if (otherActions.isNotEmpty()) View.VISIBLE else View.GONE
 
         addOrUpdateWindow()
         scheduleIdleFade()
