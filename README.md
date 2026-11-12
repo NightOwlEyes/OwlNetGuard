@@ -5,15 +5,12 @@
 </p>
 
 <p align="center">
-  <strong>Công cụ cô lập mạng & tường lửa Sinkhole thông minh cho Android</strong>
+  <strong>Công cụ cô lập mạng & tường lửa Sinkhole cho Android</strong>
 </p>
 
 <p align="center">
   <a href="https://github.com/NightOwlEyes/OwlNetGuard/releases/latest">
     <img src="https://img.shields.io/badge/Release-v1.2-8A2BE2?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.2" />
-  </a>
-  <a href="https://github.com/NightOwlEyes/OwlNetGuard/releases/latest/download/app-release.apk">
-    <img src="https://img.shields.io/badge/Download-APK-00E5FF?style=for-the-badge&logo=google-play&logoColor=black" alt="Tải về APK" />
   </a>
   <img src="https://img.shields.io/badge/Android-8.0%2B-blueviolet?style=for-the-badge&logo=android" alt="Android 8.0+" />
   <img src="https://img.shields.io/badge/Play_Protect-100%25_Compliant-success?style=for-the-badge&logo=googleplay" alt="Play Protect Safe" />
