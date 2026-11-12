@@ -12,7 +12,7 @@
   <a href="https://github.com/NightOwlEyes/OwlNetGuard/releases/latest">
     <img src="https://img.shields.io/badge/Release-v1.2-8A2BE2?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.2" />
   </a>
-  <a href="https://github.com/NightOwlEyes/OwlNetGuard/releases/latest">
+  <a href="https://github.com/NightOwlEyes/OwlNetGuard/releases/latest/download/app-release.apk">
     <img src="https://img.shields.io/badge/Download-APK-00E5FF?style=for-the-badge&logo=google-play&logoColor=black" alt="Tải về APK" />
   </a>
   <img src="https://img.shields.io/badge/Android-8.0%2B-blueviolet?style=for-the-badge&logo=android" alt="Android 8.0+" />
@@ -26,7 +26,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/NightOwlEyes/OwlNetGuard/releases/latest">
+  <a href="https://github.com/NightOwlEyes/OwlNetGuard/releases/latest/download/app-release.apk">
     <img src="https://img.shields.io/badge/⚡_TẢI_VỀ_BẢN_MỚI_NHẤT_(APK)-8A2BE2?style=for-the-badge&labelColor=1a1630&logo=android" alt="Download APK Button" height="42" />
   </a>
 </p>
