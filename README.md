@@ -14,7 +14,7 @@
   </a>
   <img src="https://img.shields.io/badge/Android-8.0%2B-blueviolet?style=for-the-badge&logo=android" alt="Android 8.0+" />
   <img src="https://img.shields.io/badge/Play_Protect-100%25_Compliant-success?style=for-the-badge&logo=googleplay" alt="Play Protect Safe" />
-  <a href="https://www.virustotal.com/gui/file/1a3c07b2bfe41cff5960704d9e199a2c0a1192a7348639f5d35de2aaa4a5b229">
+  <a href="https://www.virustotal.com/gui/file/82a87526b61d8b7ab5be81799e05edbf74026e99fa7ed9b3d1d616d6488c8fa2">
     <img src="https://img.shields.io/badge/VirusTotal-Clean%20(0%2F71)-brightgreen?style=for-the-badge&logo=virustotal" alt="VirusTotal Clean" />
   </a>
   <a href="LICENSE">
@@ -122,7 +122,7 @@ File APK sẽ nằm tại:
 ## 🛡️ Kiểm định an toàn & VirusTotal
 
 OwlNetGuard hoàn toàn sạch mã độc, đạt chuẩn an toàn 100%:
-* 🟢 **Báo cáo VirusTotal**: [Clean 100%](https://www.virustotal.com/gui/file/1a3c07b2bfe41cff5960704d9e199a2c0a1192a7348639f5d35de2aaa4a5b229)
+* 🟢 **Báo cáo VirusTotal**: [Clean 100%](https://www.virustotal.com/gui/file/82a87526b61d8b7ab5be81799e05edbf74026e99fa7ed9b3d1d616d6488c8fa2)
 * 🟢 **Google Play Protect**: Tuân thủ 100% tiêu chuẩn bảo mật của Android, hoạt động hoàn toàn cục bộ không thu thập dữ liệu người dùng.
 
 ---
