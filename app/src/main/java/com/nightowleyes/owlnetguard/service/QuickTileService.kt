@@ -5,6 +5,7 @@ import android.content.Intent
 import android.graphics.drawable.Icon
 import android.net.VpnService
 import android.os.Build
+import android.provider.Settings
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import com.nightowleyes.owlnetguard.R
@@ -20,41 +21,57 @@ class QuickTileService : TileService() {
 
     override fun onClick() {
         super.onClick()
-        if (VpnService.prepare(this) != null) {
-            openMainActivity()
+        val isCurrentlyOn = PreferencesManager.isPopupEnabled(this)
+
+        if (isCurrentlyOn) {
+            // Popup tắt tương đương VPN tắt
+            PreferencesManager.setPopupEnabled(this, false)
+            refreshTile()
             return
         }
 
-        PreferencesManager.toggleBubbleIsolation(this)
+        // Muốn bật Popup + VPN: kiểm tra đủ 2 quyền VPN & Hiển thị trên ứng dụng khác
+        val vpnGranted = VpnService.prepare(this) == null
+        val overlayGranted = Settings.canDrawOverlays(this)
+
+        if (!vpnGranted || !overlayGranted) {
+            openMainActivityToGrantPermissions()
+            return
+        }
+
+        // Đủ quyền: bật ngay Popup + VPN mà không cần mở ứng dụng
+        PreferencesManager.setPopupEnabled(this, true)
         refreshTile()
     }
 
     private fun refreshTile() {
         val tile = qsTile ?: return
-        val isIsolated = PreferencesManager.isBubbleIsolated(this)
-        val activeCount = PreferencesManager.getActivePackages(this).size
+        val isPopupOn = PreferencesManager.isPopupEnabled(this) &&
+            VpnService.prepare(this) == null &&
+            Settings.canDrawOverlays(this)
+        val activeCount = PreferencesManager.getEffectiveBlockedPackages(this)
+            .filter { it != packageName }.size
 
-        tile.state = if (isIsolated) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
-        tile.label = if (isIsolated) "Đang cô lập ($activeCount)" else "OwlNetGuard"
+        tile.state = if (isPopupOn) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
+        tile.label = "OwlNetGuard"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            tile.subtitle = if (isIsolated) "VPN Nền đang bật" else "Sẵn sàng ($activeCount ứng dụng)"
+            tile.subtitle = when {
+                !isPopupOn -> "Đã tắt"
+                activeCount > 0 -> "Đang cách ly ($activeCount)"
+                else -> "Phím nổi đang bật"
+            }
         }
-        tile.icon = Icon.createWithResource(
-            this,
-            if (isIsolated) R.drawable.ic_shield_isolated else R.drawable.ic_shield_normal
-        )
+        tile.icon = Icon.createWithResource(this, R.drawable.ic_qs_tile_owl)
         tile.updateTile()
     }
 
-
-
-    private fun openMainActivity() {
+    private fun openMainActivityToGrantPermissions() {
         val intent = Intent(this, MainActivity::class.java).apply {
             addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP
             )
-            putExtra(MainActivity.EXTRA_REQUEST_VPN_PERMISSION, true)
+            putExtra(MainActivity.EXTRA_ENABLE_POPUP_FROM_TILE, true)
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -62,8 +79,7 @@ class QuickTileService : TileService() {
                 this,
                 300,
                 intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or
-                        PendingIntent.FLAG_IMMUTABLE
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             startActivityAndCollapse(pendingIntent)
         } else {

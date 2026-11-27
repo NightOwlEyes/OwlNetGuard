@@ -73,20 +73,22 @@ class LocalVpnService : VpnService() {
         }
 
         val mode = PreferencesManager.getIsolationMode(this)
+        val isDisrupting = PreferencesManager.isDisruptingNetwork()
         val effectiveBlocked = PreferencesManager.getEffectiveBlockedPackages(this)
             .filterTo(LinkedHashSet()) { it != packageName }
         val allManagedPackages = PreferencesManager.getBubblePackages(this)
             .filterTo(LinkedHashSet()) { it != packageName }
 
-        // Determine targetPackages based on isolation mode:
+        // Determine targetPackages based on isolation mode & disruption state:
+        // - When disrupting network ("Làm gián đoạn mạng"): temporarily eject all managed apps
+        //   out of the VPN tunnel (binding only OwlNetGuard itself) to trigger immediate
+        //   ConnectivityManager interface change & socket reset for the target apps.
         // - In Mode All ("Tất cả app đã chọn"): all managed apps remain bound in addAllowedApplication
         //   so their traffic falls through to physical network when unblocked, or to sinkhole when blocked.
         // - In Foreground Mode ("Chỉ app đang mở"): ONLY the currently opened app is put into the tunnel.
-        //   When no managed app is open, targetPackages is empty (tunnel closed, direct physical network).
-        //   While using the app, targetPackages stays setOf(fgApp) continuously so toggling isolation
-        //   does not recreate the tunnel or disconnect sockets. Only when completely exiting the app
-        //   ("out hẳn app") is targetPackages cleared back to empty.
-        val targetPackages: Set<String> = if (mode == PreferencesManager.ISOLATION_MODE_FOREGROUND) {
+        val targetPackages: Set<String> = if (isDisrupting) {
+            setOf(packageName)
+        } else if (mode == PreferencesManager.ISOLATION_MODE_FOREGROUND) {
             val fgTunnelPkg = PreferencesManager.getForegroundTunnelPackage()
             if (fgTunnelPkg != null && allManagedPackages.contains(fgTunnelPkg)) {
                 setOf(fgTunnelPkg)
@@ -97,8 +99,8 @@ class LocalVpnService : VpnService() {
             allManagedPackages.ifEmpty { effectiveBlocked }
         }
 
-        // isBlocked is true if and only if there are packages actively marked for isolation.
-        val isBlocked = effectiveBlocked.isNotEmpty()
+        // isBlocked is true if and only if not disrupting and there are packages actively marked for isolation.
+        val isBlocked = !isDisrupting && effectiveBlocked.isNotEmpty()
 
         startOrUpdateForegroundNotification()
 
@@ -281,21 +283,19 @@ class LocalVpnService : VpnService() {
         val effectiveCount = PreferencesManager.getEffectiveBlockedPackages(this)
             .filter { it != packageName }.size
         val mode = PreferencesManager.getIsolationMode(this)
-        val isBubbleEnabled = PreferencesManager.isBubbleOverlayEnabled(this)
 
         val title = when {
-            !isIsolationActive -> "VPN Nền đang trực (Đang tạm dừng cách ly)"
+            !isIsolationActive -> "Phím nổi đang bật (Đang tạm dừng cách ly)"
             effectiveCount > 0 -> "Đang cách ly mạng ($effectiveCount ứng dụng)"
-            else -> "VPN Nền đang trực (Chờ kích hoạt ứng dụng)"
+            else -> "Phím nổi đang bật (Chờ mở ứng dụng)"
         }
 
         val modeText = if (mode == PreferencesManager.ISOLATION_MODE_FOREGROUND) {
-            "Cách ly: App đang mở"
+            "Chế độ: Chỉ app đang mở"
         } else {
-            "Cách ly: Tất cả app đã chọn"
+            "Chế độ: Tất cả app đã chọn"
         }
-        val bubbleText = if (isBubbleEnabled) "Phím nổi: Bật" else "Phím nổi: Tắt"
-        val subtitle = "$modeText • $bubbleText"
+        val subtitle = "$modeText • VPN nền đang bật"
 
         val openAppIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -314,16 +314,6 @@ class LocalVpnService : VpnService() {
             this,
             101,
             stopServiceIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val toggleBubbleIntent = Intent(this, NotificationActionReceiver::class.java).apply {
-            action = NotificationActionReceiver.ACTION_TOGGLE_BUBBLE_VISIBILITY
-        }
-        val toggleBubblePending = PendingIntent.getBroadcast(
-            this,
-            102,
-            toggleBubbleIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -346,13 +336,8 @@ class LocalVpnService : VpnService() {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .addAction(
                 R.drawable.ic_power,
-                "Dừng dịch vụ",
+                "Tắt phím nổi (Dừng VPN)",
                 stopServicePending
-            )
-            .addAction(
-                if (isBubbleEnabled) R.drawable.ic_bubble_inactive else R.drawable.ic_bubble_active,
-                if (isBubbleEnabled) "Tắt phím nổi" else "Bật phím nổi",
-                toggleBubblePending
             )
             .build()
 

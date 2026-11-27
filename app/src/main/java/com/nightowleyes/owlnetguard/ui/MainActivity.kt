@@ -25,12 +25,19 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == RESULT_OK) {
-            PreferencesManager.setVpnEnabled(this, true)
-            PreferencesManager.syncAllServices(this)
-            Toast.makeText(this, "Đã cấp quyền VPN và khởi động dịch vụ!", Toast.LENGTH_SHORT).show()
+            if (Settings.canDrawOverlays(this)) {
+                PreferencesManager.setPopupEnabled(this, true)
+                Toast.makeText(this, "Đã bật Phím nổi và VPN nền!", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(
+                    this,
+                    "Đã cấp quyền VPN! Vui lòng cấp thêm quyền Hiển thị trên ứng dụng khác.",
+                    Toast.LENGTH_LONG
+                ).show()
+                openOverlayPermissionSettings()
+            }
         } else {
-            PreferencesManager.setVpnEnabled(this, false)
-            PreferencesManager.syncAllServices(this)
+            PreferencesManager.setPopupEnabled(this, false)
             Toast.makeText(this, "Chưa cấp quyền VPN!", Toast.LENGTH_SHORT).show()
         }
     }
@@ -58,8 +65,20 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIncomingIntent(intent: Intent?) {
-        if (intent?.getBooleanExtra(EXTRA_REQUEST_VPN_PERMISSION, false) == true) {
-            requestVpnPermissionAndSync()
+        val fromTile = intent?.getBooleanExtra(EXTRA_ENABLE_POPUP_FROM_TILE, false) == true
+        val reqVpn = intent?.getBooleanExtra(EXTRA_REQUEST_VPN_PERMISSION, false) == true
+
+        if (fromTile || reqVpn) {
+            if (!Settings.canDrawOverlays(this)) {
+                Toast.makeText(
+                    this,
+                    "Vui lòng cấp quyền Hiển thị trên ứng dụng khác để bật Phím nổi",
+                    Toast.LENGTH_LONG
+                ).show()
+                openOverlayPermissionSettings()
+            } else {
+                requestVpnPermissionAndSync()
+            }
         } else if (VpnService.prepare(this) == null) {
             PreferencesManager.syncAllServices(this)
         }
@@ -69,9 +88,10 @@ class MainActivity : ComponentActivity() {
         val prepareIntent = VpnService.prepare(this)
         if (prepareIntent != null) {
             vpnPermissionLauncher.launch(prepareIntent)
+        } else if (Settings.canDrawOverlays(this)) {
+            PreferencesManager.setPopupEnabled(this, true)
         } else {
-            PreferencesManager.setVpnEnabled(this, true)
-            PreferencesManager.syncAllServices(this)
+            openOverlayPermissionSettings()
         }
     }
 
@@ -105,6 +125,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_REQUEST_VPN_PERMISSION = "REQUEST_VPN_PERMISSION"
+        const val EXTRA_ENABLE_POPUP_FROM_TILE = "ENABLE_POPUP_FROM_TILE"
         const val GITHUB_REPO_URL = "https://github.com/NightOwlEyes/OwlNetGuard"
         const val GITHUB_RELEASES_URL = "https://github.com/NightOwlEyes/OwlNetGuard/releases"
         const val GITHUB_SPONSORS_URL = "https://github.com/sponsors/NightOwlEyes"

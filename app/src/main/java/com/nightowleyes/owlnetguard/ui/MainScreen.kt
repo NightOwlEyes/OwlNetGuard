@@ -1,7 +1,11 @@
 package com.nightowleyes.owlnetguard.ui
 
+import android.app.StatusBarManager
+import android.content.ComponentName
 import android.content.Intent
 import android.content.res.Configuration
+import android.graphics.drawable.Icon
+import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -36,30 +40,37 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.nightowleyes.owlnetguard.R
 import com.nightowleyes.owlnetguard.data.AppInfo
-import com.nightowleyes.owlnetguard.utils.AppListLoader
 import com.nightowleyes.owlnetguard.data.PreferencesManager
+import com.nightowleyes.owlnetguard.service.QuickTileService
+import com.nightowleyes.owlnetguard.ui.components.EmptySelectedAppsView
 import com.nightowleyes.owlnetguard.ui.components.FacetedAmbientBackground
 import com.nightowleyes.owlnetguard.ui.components.FloatingHudSettingsCard
 import com.nightowleyes.owlnetguard.ui.components.HeaderSection
-import com.nightowleyes.owlnetguard.ui.components.IsolationMasterCard
-import com.nightowleyes.owlnetguard.ui.components.EmptySelectedAppsView
 import com.nightowleyes.owlnetguard.ui.components.LoadingStateView
+import com.nightowleyes.owlnetguard.ui.components.QuickTileSuggestionBanner
 import com.nightowleyes.owlnetguard.ui.components.SelectedAppsHeaderBar
 import com.nightowleyes.owlnetguard.ui.components.SwipeableSelectedAppItem
+import com.nightowleyes.owlnetguard.ui.components.UpdateAvailableBanner
 import com.nightowleyes.owlnetguard.ui.dialogs.AppPickerDialog
+import com.nightowleyes.owlnetguard.ui.dialogs.AvailableUpdateInfo
 import com.nightowleyes.owlnetguard.ui.dialogs.CheckUpdateDialog
+import com.nightowleyes.owlnetguard.ui.dialogs.DisruptInfoDialog
 import com.nightowleyes.owlnetguard.ui.dialogs.DonateDialog
 import com.nightowleyes.owlnetguard.ui.dialogs.ExcludedAppsDialog
 import com.nightowleyes.owlnetguard.ui.dialogs.InfoDialogType
 import com.nightowleyes.owlnetguard.ui.dialogs.OpenSourceLicensesDialog
 import com.nightowleyes.owlnetguard.ui.dialogs.PrivacyPolicyDialog
 import com.nightowleyes.owlnetguard.ui.dialogs.UsageAccessPromptDialog
+import com.nightowleyes.owlnetguard.ui.dialogs.fetchAvailableUpdate
 import com.nightowleyes.owlnetguard.ui.theme.SlateBackground
+import com.nightowleyes.owlnetguard.utils.AppListLoader
 import com.nightowleyes.owlnetguard.utils.ForegroundAppDetector
 import com.nightowleyes.owlnetguard.utils.NetworkSettingsHelper
 
@@ -79,46 +90,62 @@ fun MainScreen(
 
     var showInfoMenu by remember { mutableStateOf(false) }
     var activeDialog by remember { mutableStateOf(InfoDialogType.NONE) }
+    var showDisruptInfoDialog by remember { mutableStateOf(false) }
 
-    var isVpnEnabled by remember { mutableStateOf(PreferencesManager.isVpnEnabled(context)) }
-    var isBubbleOverlayEnabled by remember { mutableStateOf(PreferencesManager.isBubbleOverlayEnabled(context)) }
+    var isPopupEnabled by remember { mutableStateOf(PreferencesManager.isPopupEnabled(context)) }
     var isBubbleIsolated by remember { mutableStateOf(PreferencesManager.isBubbleIsolated(context)) }
     var bubblePackages by remember { mutableStateOf(PreferencesManager.getBubblePackages(context)) }
     var activePackages by remember { mutableStateOf(PreferencesManager.getActivePackages(context)) }
     var isolationMode by remember { mutableIntStateOf(PreferencesManager.getIsolationMode(context)) }
 
     var canDrawOverlays by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
+    var isVpnGranted by remember { mutableStateOf(PreferencesManager.isVpnPermissionGranted(context)) }
     var hasUsageStatsPermission by remember { mutableStateOf(ForegroundAppDetector.hasUsageStatsPermission(context)) }
 
     var showBubbleIsolate by remember { mutableStateOf(PreferencesManager.isBubbleIsolateVisible(context)) }
-    var showBubbleWifi by remember { mutableStateOf(PreferencesManager.isBubbleWifiVisible(context)) }
-    var showBubbleData by remember { mutableStateOf(PreferencesManager.isBubbleDataVisible(context)) }
-    var showBubbleAirplane by remember { mutableStateOf(PreferencesManager.isBubbleAirplaneVisible(context)) }
+    var showBubbleDisrupt by remember { mutableStateOf(PreferencesManager.isBubbleDisruptVisible(context)) }
     var isAutoUnisolateOnReconnect by remember { mutableStateOf(PreferencesManager.isAutoUnisolateOnReconnect(context)) }
     var excludedOverlayPackages by remember { mutableStateOf(PreferencesManager.getExcludedOverlayPackages(context)) }
     var showExcludedAppsDialog by remember { mutableStateOf(false) }
 
+    var isQsTileSuggestionDismissed by remember {
+        mutableStateOf(PreferencesManager.isQsTileSuggestionDismissed(context))
+    }
+    var availableUpdate by remember { mutableStateOf<AvailableUpdateInfo?>(null) }
+
     fun refreshPrefsState() {
-        isVpnEnabled = PreferencesManager.isVpnEnabled(context)
-        isBubbleOverlayEnabled = PreferencesManager.isBubbleOverlayEnabled(context)
+        isPopupEnabled = PreferencesManager.isPopupEnabled(context)
         isBubbleIsolated = PreferencesManager.isBubbleIsolated(context)
         bubblePackages = PreferencesManager.getBubblePackages(context)
         activePackages = PreferencesManager.getActivePackages(context)
         isolationMode = PreferencesManager.getIsolationMode(context)
 
         canDrawOverlays = Settings.canDrawOverlays(context)
+        isVpnGranted = PreferencesManager.isVpnPermissionGranted(context)
         hasUsageStatsPermission = ForegroundAppDetector.hasUsageStatsPermission(context)
 
         showBubbleIsolate = PreferencesManager.isBubbleIsolateVisible(context)
-        showBubbleWifi = PreferencesManager.isBubbleWifiVisible(context)
-        showBubbleData = PreferencesManager.isBubbleDataVisible(context)
-        showBubbleAirplane = PreferencesManager.isBubbleAirplaneVisible(context)
+        showBubbleDisrupt = PreferencesManager.isBubbleDisruptVisible(context)
         isAutoUnisolateOnReconnect = PreferencesManager.isAutoUnisolateOnReconnect(context)
         excludedOverlayPackages = PreferencesManager.getExcludedOverlayPackages(context)
+        isQsTileSuggestionDismissed = PreferencesManager.isQsTileSuggestionDismissed(context)
     }
 
     LaunchedEffect(stateVersion) {
         refreshPrefsState()
+    }
+
+    // Tự động kiểm tra bản cập nhật mới từ GitHub khi người dùng mở app
+    LaunchedEffect(Unit) {
+        val update = fetchAvailableUpdate()
+        if (update != null) {
+            availableUpdate = update
+            if (PreferencesManager.getDismissedUpdateVersion(context) != update.version &&
+                activeDialog == InfoDialogType.NONE
+            ) {
+                activeDialog = InfoDialogType.CHECK_UPDATE
+            }
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -130,7 +157,6 @@ fun MainScreen(
         isLoading = false
         refreshPrefsState()
 
-        // Proactively check if Foreground Only mode is selected without Usage Access permission
         if (PreferencesManager.getIsolationMode(context) == PreferencesManager.ISOLATION_MODE_FOREGROUND &&
             !ForegroundAppDetector.hasUsageStatsPermission(context)
         ) {
@@ -158,7 +184,11 @@ fun MainScreen(
     ) {
         refreshPrefsState()
         if (Settings.canDrawOverlays(context)) {
-            PreferencesManager.setBubbleOverlayEnabled(context, true)
+            if (PreferencesManager.isVpnPermissionGranted(context)) {
+                PreferencesManager.setPopupEnabled(context, true)
+            } else {
+                onRequestVpnPermission()
+            }
         }
     }
 
@@ -188,8 +218,45 @@ fun MainScreen(
         }
     }
 
-    // Selected apps in the main list ("Ứng dụng đã chọn")
-    val isAppIsolatedOverall = isVpnEnabled && isBubbleIsolated
+    fun requestAddQuickSettingsTile() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            try {
+                val statusBarManager = context.getSystemService(StatusBarManager::class.java)
+                statusBarManager?.requestAddTileService(
+                    ComponentName(context, QuickTileService::class.java),
+                    "OwlNetGuard",
+                    Icon.createWithResource(context, R.drawable.ic_qs_tile_owl),
+                    ContextCompat.getMainExecutor(context)
+                ) { resultCode ->
+                    when (resultCode) {
+                        StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED -> {
+                            PreferencesManager.setQsTileSuggestionDismissed(context, true)
+                            Toast.makeText(context, "Đã thêm OwlNetGuard vào Cài đặt nhanh!", Toast.LENGTH_SHORT).show()
+                        }
+                        StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED -> {
+                            PreferencesManager.setQsTileSuggestionDismissed(context, true)
+                            Toast.makeText(context, "OwlNetGuard đã có sẵn trên thanh Cài đặt nhanh.", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+                Toast.makeText(
+                    context,
+                    "Kéo thanh thông báo xuống -> Chỉnh sửa -> Kéo OwlNetGuard lên Cài đặt nhanh",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        } else {
+            Toast.makeText(
+                context,
+                "Kéo thanh thông báo xuống -> Chỉnh sửa -> Kéo OwlNetGuard lên Cài đặt nhanh",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    val isPopupActive = isPopupEnabled && canDrawOverlays && isVpnGranted
+    val isAppIsolatedOverall = isPopupActive && isBubbleIsolated
     val selectedApps = remember(allApps, bubblePackages, activePackages, isAppIsolatedOverall) {
         allApps
             .filter { bubblePackages.contains(it.packageName) }
@@ -214,15 +281,13 @@ fun MainScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Ambient Low-Poly Faceted Prism Background Mesh
             FacetedAmbientBackground()
 
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-                // Header Bar with Exact Faceted Apex Owl Logo + Info Menu
                 HeaderSection(
-                    isIsolated = isVpnEnabled && activeSelectedCount > 0 && isBubbleIsolated,
+                    isIsolated = isPopupActive && activeSelectedCount > 0 && isBubbleIsolated,
                     showInfoMenu = showInfoMenu,
                     onToggleInfoMenu = { showInfoMenu = !showInfoMenu },
                     onDismissInfoMenu = { showInfoMenu = false },
@@ -237,60 +302,84 @@ fun MainScreen(
                 )
 
                 val controlsContent: @Composable () -> Unit = {
-                    // 1. Top Section: Cách ly ứng dụng
-                    IsolationMasterCard(
-                        isVpnEnabled = isVpnEnabled,
-                        isBubbleOverlayEnabled = isBubbleOverlayEnabled,
-                        isolationMode = isolationMode,
-                        isIsolationActive = isBubbleIsolated,
+                    // 1. Banner thông báo cập nhật mới (chỉ hiện khi phát hiện bản mới trên GitHub)
+                    availableUpdate?.let { update ->
+                        UpdateAvailableBanner(
+                            updateInfo = update,
+                            onOpenUpdate = { activeDialog = InfoDialogType.CHECK_UPDATE },
+                            onDismiss = {
+                                PreferencesManager.setDismissedUpdateVersion(context, update.version)
+                                availableUpdate = null
+                            }
+                        )
+                    }
+
+                    // 2. Đề xuất thêm ô Cài đặt nhanh ở đầu ứng dụng (có thể xóa đi)
+                    if (!isQsTileSuggestionDismissed) {
+                        QuickTileSuggestionBanner(
+                            onAddTile = { requestAddQuickSettingsTile() },
+                            onDismiss = {
+                                PreferencesManager.setQsTileSuggestionDismissed(context, true)
+                            }
+                        )
+                    }
+
+                    // 3. Thẻ điều khiển chính: Phím nổi (HUD) — Popup bật = VPN bật
+                    FloatingHudSettingsCard(
+                        isPopupActive = isPopupActive,
+                        canDrawOverlays = canDrawOverlays,
+                        isVpnGranted = isVpnGranted,
                         activeAppsCount = activeSelectedCount,
                         totalSelectedCount = selectedApps.size,
-                        onToggleVpn = { enabled ->
-                            if (enabled && !PreferencesManager.isVpnPermissionGranted(context)) {
-                                onRequestVpnPermission()
-                            } else {
-                                PreferencesManager.setVpnEnabled(context, enabled)
-                                if (!enabled) {
-                                    // Tự động làm mờ/tắt Phím nổi khi tắt Cách ly ứng dụng
-                                    PreferencesManager.setBubbleOverlayEnabled(context, false)
-                                }
-                            }
-                        }
-                    )
-
-                    // 2. Second Section: Phím nổi thông minh (HUD) & Cài đặt phụ thuộc
-                    FloatingHudSettingsCard(
-                        isVpnEnabled = isVpnEnabled,
-                        canDrawOverlays = canDrawOverlays,
-                        isOverlayEnabled = isBubbleOverlayEnabled,
                         showIsolate = showBubbleIsolate,
-                        showWifi = showBubbleWifi,
-                        showData = showBubbleData,
-                        showAirplane = showBubbleAirplane,
+                        showDisrupt = showBubbleDisrupt,
                         isolationMode = isolationMode,
                         hasUsageStatsPermission = hasUsageStatsPermission,
                         isAutoUnisolate = isAutoUnisolateOnReconnect,
                         excludedAppsCount = excludedOverlayPackages.size,
-                        onToggleMasterOverlay = { checked ->
-                            if (checked && !Settings.canDrawOverlays(context)) {
-                                try {
-                                    overlayLauncher.launch(
-                                        Intent(
-                                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                            "package:${context.packageName}".toUri()
-                                        )
-                                    )
-                                } catch (_: Exception) {
-                                    onRequestOverlayPermission()
-                                }
+                        onToggleMasterPopup = { checked ->
+                            if (!checked) {
+                                PreferencesManager.setPopupEnabled(context, false)
                             } else {
-                                PreferencesManager.setBubbleOverlayEnabled(context, checked)
+                                if (!Settings.canDrawOverlays(context)) {
+                                    try {
+                                        overlayLauncher.launch(
+                                            Intent(
+                                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                                "package:${context.packageName}".toUri()
+                                            )
+                                        )
+                                    } catch (_: Exception) {
+                                        onRequestOverlayPermission()
+                                    }
+                                } else if (!PreferencesManager.isVpnPermissionGranted(context)) {
+                                    onRequestVpnPermission()
+                                } else {
+                                    PreferencesManager.setPopupEnabled(context, true)
+                                }
                             }
                         },
-                        onToggleIsolate = { PreferencesManager.setBubbleIsolateVisible(context, it) },
-                        onToggleWifi = { PreferencesManager.setBubbleWifiVisible(context, it) },
-                        onToggleData = { PreferencesManager.setBubbleDataVisible(context, it) },
-                        onToggleAirplane = { PreferencesManager.setBubbleAirplaneVisible(context, it) },
+                        onToggleIsolate = { checked ->
+                            val ok = PreferencesManager.setBubbleIsolateVisible(context, checked)
+                            if (!ok) {
+                                Toast.makeText(
+                                    context,
+                                    "Phải giữ ít nhất 1 nút hiển thị trên phím nổi!",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        },
+                        onToggleDisrupt = { checked ->
+                            val ok = PreferencesManager.setBubbleDisruptVisible(context, checked)
+                            if (!ok) {
+                                Toast.makeText(
+                                    context,
+                                    "Phải giữ ít nhất 1 nút hiển thị trên phím nổi!",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        },
+                        onShowDisruptInfo = { showDisruptInfoDialog = true },
                         onToggleAutoUnisolate = { PreferencesManager.setAutoUnisolateOnReconnect(context, it) },
                         onSelectIsolationMode = { mode ->
                             PreferencesManager.setIsolationMode(context, mode)
@@ -308,38 +397,14 @@ fun MainScreen(
                     )
                 }
 
-                val handleToggleAppActive: (AppInfo) -> Unit = { app ->
-                    if (isolationMode == PreferencesManager.ISOLATION_MODE_FOREGROUND) {
-                        Toast.makeText(
-                            context,
-                            "Chế độ 'Chỉ app đang mở': Ứng dụng sẽ tự động cách ly khi bạn mở ứng dụng đó lên màn hình.",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    } else if (isBubbleOverlayEnabled) {
-                        // Mode "Tất cả app đã chọn" khi Phím nổi BẬT:
-                        // Bấm vào một ứng dụng thì toàn bộ app chuyển thành "Đang tạm dừng" -> (1) / "Đang cách ly" -> (2)
-                        val currentActive = PreferencesManager.getActivePackages(context)
-                        if (currentActive.isNotEmpty()) {
-                            PreferencesManager.setAllPackagesActive(context, false)
-                        } else {
-                            PreferencesManager.setAllPackagesActive(context, true)
-                        }
-                    } else {
-                        // Phím nổi TẮT: Tùy chỉnh bật/tắt từng ứng dụng độc lập
-                        PreferencesManager.togglePackageActive(context, app.packageName)
-                    }
-                }
-
                 val appsContent: @Composable (Modifier) -> Unit = { paneModifier ->
                     Column(modifier = paneModifier) {
-                        // Unified Header: "Ứng dụng đã chọn" + Button "Chọn ứng dụng"
                         SelectedAppsHeaderBar(
                             selectedCount = selectedApps.size,
                             activeCount = activeSelectedCount,
                             onOpenAppPicker = { showAppPickerDialog = true }
                         )
 
-                        // Selected Apps List (with Hexagon Active/Pause toggle & Swipe left/right to remove)
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -365,8 +430,6 @@ fun MainScreen(
                                         ) { app ->
                                             SwipeableSelectedAppItem(
                                                 app = app,
-                                                isVpnIsolated = isVpnEnabled && isBubbleIsolated,
-                                                onToggleActive = { handleToggleAppActive(app) },
                                                 onRemoveFromList = {
                                                     PreferencesManager.removePackageFromBubble(
                                                         context,
@@ -410,7 +473,6 @@ fun MainScreen(
                         )
                     }
                 } else {
-                    // Portrait Mode: Single unified scrollable surface ("Làm phẳng mục ứng dụng đã chọn")
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -418,7 +480,6 @@ fun MainScreen(
                     ) {
                         controlsContent()
 
-                        // Unified Header: "Ứng dụng đã chọn" + Button "Chọn ứng dụng"
                         SelectedAppsHeaderBar(
                             selectedCount = selectedApps.size,
                             activeCount = activeSelectedCount,
@@ -439,8 +500,6 @@ fun MainScreen(
                                     key(app.packageName) {
                                         SwipeableSelectedAppItem(
                                             app = app,
-                                            isVpnIsolated = isVpnEnabled && isBubbleIsolated,
-                                            onToggleActive = { handleToggleAppActive(app) },
                                             onRemoveFromList = {
                                                 PreferencesManager.removePackageFromBubble(
                                                     context,
@@ -463,7 +522,6 @@ fun MainScreen(
                 }
             }
 
-            // App Picker Modal Dialog ("Bảng chọn ứng dụng")
             if (showAppPickerDialog) {
                 AppPickerDialog(
                     allApps = allApps,
@@ -475,7 +533,6 @@ fun MainScreen(
                 )
             }
 
-            // Excluded Overlay Apps Dialog ("Ứng dụng ngoại lệ khi mở đè - Cách B")
             if (showExcludedAppsDialog) {
                 ExcludedAppsDialog(
                     allApps = allApps,
@@ -488,7 +545,10 @@ fun MainScreen(
                 )
             }
 
-            // Info & Permission Dialogs
+            if (showDisruptInfoDialog) {
+                DisruptInfoDialog(onDismiss = { showDisruptInfoDialog = false })
+            }
+
             when (activeDialog) {
                 InfoDialogType.USAGE_ACCESS_PROMPT -> {
                     UsageAccessPromptDialog(
@@ -525,7 +585,12 @@ fun MainScreen(
                 }
                 InfoDialogType.CHECK_UPDATE -> {
                     CheckUpdateDialog(
-                        onDismiss = { activeDialog = InfoDialogType.NONE },
+                        onDismiss = {
+                            availableUpdate?.let {
+                                PreferencesManager.setDismissedUpdateVersion(context, it.version)
+                            }
+                            activeDialog = InfoDialogType.NONE
+                        },
                         onOpenReleases = { url ->
                             try {
                                 context.startActivity(

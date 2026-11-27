@@ -30,7 +30,7 @@
             android:layout_centerInParent="true"/>
     </RelativeLayout>
 
-    <!-- 2. Expanded View: Action Bar with N Action Buttons + Dedicated Collapse Button -->
+    <!-- 2. Expanded View: Action Bar with Isolate + Network Disrupt + Collapse -->
     <LinearLayout
         android:id="@+id/panelExpanded"
         android:layout_width="wrap_content"
@@ -66,9 +66,9 @@
                 android:layout_centerInParent="true"/>
         </RelativeLayout>
 
-        <!-- Button 2: Wi-Fi Toggle -->
+        <!-- Button 2: Làm gián đoạn mạng (Tunnel Disruption) -->
         <RelativeLayout
-            android:id="@+id/btnActionWifi"
+            android:id="@+id/btnActionDisrupt"
             android:layout_width="36dp"
             android:layout_height="36dp"
             android:layout_marginStart="4dp"
@@ -78,73 +78,14 @@
             android:focusable="false"
             android:gravity="center">
             <ImageView
-                android:id="@+id/imgActionWifi"
-                android:layout_width="19dp"
-                android:layout_height="19dp"
-                android:src="@drawable/ic_wifi"
-                android:layout_centerInParent="true"/>
-            <ImageView
-                android:id="@+id/slashActionWifi"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:src="@drawable/ic_bubble_slash"
-                android:visibility="gone"
+                android:id="@+id/imgActionDisrupt"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_network_disrupt"
                 android:layout_centerInParent="true"/>
         </RelativeLayout>
 
-        <!-- Button 3: Mobile Data Toggle -->
-        <RelativeLayout
-            android:id="@+id/btnActionData"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:layout_marginStart="2dp"
-            android:layout_marginEnd="2dp"
-            android:background="@drawable/bg_floating_bubble"
-            android:clickable="true"
-            android:focusable="false"
-            android:gravity="center">
-            <ImageView
-                android:id="@+id/imgActionData"
-                android:layout_width="19dp"
-                android:layout_height="19dp"
-                android:src="@drawable/ic_mobile_data"
-                android:layout_centerInParent="true"/>
-            <ImageView
-                android:id="@+id/slashActionData"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:src="@drawable/ic_bubble_slash"
-                android:visibility="gone"
-                android:layout_centerInParent="true"/>
-        </RelativeLayout>
-
-        <!-- Button 4: Airplane Mode Toggle -->
-        <RelativeLayout
-            android:id="@+id/btnActionAirplane"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:layout_marginStart="2dp"
-            android:layout_marginEnd="2dp"
-            android:background="@drawable/bg_floating_bubble"
-            android:clickable="true"
-            android:focusable="false"
-            android:gravity="center">
-            <ImageView
-                android:id="@+id/imgActionAirplane"
-                android:layout_width="19dp"
-                android:layout_height="19dp"
-                android:src="@drawable/ic_airplane"
-                android:layout_centerInParent="true"/>
-            <ImageView
-                android:id="@+id/slashActionAirplane"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:src="@drawable/ic_bubble_slash"
-                android:visibility="gone"
-                android:layout_centerInParent="true"/>
-        </RelativeLayout>
-
-        <!-- Button N+1: Nút Gom Lại (Dedicated Collapse Button) -->
+        <!-- Button 3: Nút Gom Lại (Dedicated Collapse Button) -->
         <RelativeLayout
             android:id="@+id/btnActionCollapse"
             android:layout_width="36dp"

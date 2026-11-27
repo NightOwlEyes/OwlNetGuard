@@ -14,6 +14,10 @@ val JosefinSans = FontFamily(
     Font(R.font.josefin_sans_bold, FontWeight.Bold)
 )
 
+val Alata = FontFamily(
+    Font(R.font.alata_regular, FontWeight.Normal)
+)
+
 private val defaultTypography = Typography()
 
 val Typography = Typography(
@@ -26,10 +30,10 @@ val Typography = Typography(
     titleLarge = defaultTypography.titleLarge.copy(fontFamily = JosefinSans),
     titleMedium = defaultTypography.titleMedium.copy(fontFamily = JosefinSans),
     titleSmall = defaultTypography.titleSmall.copy(fontFamily = JosefinSans),
-    bodyLarge = defaultTypography.bodyLarge.copy(fontFamily = JosefinSans),
-    bodyMedium = defaultTypography.bodyMedium.copy(fontFamily = JosefinSans),
-    bodySmall = defaultTypography.bodySmall.copy(fontFamily = JosefinSans),
-    labelLarge = defaultTypography.labelLarge.copy(fontFamily = JosefinSans),
-    labelMedium = defaultTypography.labelMedium.copy(fontFamily = JosefinSans),
-    labelSmall = defaultTypography.labelSmall.copy(fontFamily = JosefinSans)
+    bodyLarge = defaultTypography.bodyLarge.copy(fontFamily = Alata),
+    bodyMedium = defaultTypography.bodyMedium.copy(fontFamily = Alata),
+    bodySmall = defaultTypography.bodySmall.copy(fontFamily = Alata),
+    labelLarge = defaultTypography.labelLarge.copy(fontFamily = Alata),
+    labelMedium = defaultTypography.labelMedium.copy(fontFamily = Alata),
+    labelSmall = defaultTypography.labelSmall.copy(fontFamily = Alata)
 )

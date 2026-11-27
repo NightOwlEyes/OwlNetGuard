@@ -57,7 +57,7 @@ fun OwlNetGuardTheme(
         typography = Typography
     ) {
         CompositionLocalProvider(
-            LocalTextStyle provides LocalTextStyle.current.copy(fontFamily = JosefinSans)
+            LocalTextStyle provides LocalTextStyle.current.copy(fontFamily = Alata)
         ) {
             content()
         }

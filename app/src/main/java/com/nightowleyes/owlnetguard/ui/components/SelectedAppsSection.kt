@@ -31,6 +31,7 @@ import com.nightowleyes.owlnetguard.ui.theme.BrandPrimary
 import com.nightowleyes.owlnetguard.ui.theme.CyberCyan
 import com.nightowleyes.owlnetguard.ui.theme.FacetedBadgeShape
 import com.nightowleyes.owlnetguard.ui.theme.FacetedTileShape
+import com.nightowleyes.owlnetguard.ui.theme.JosefinSans
 import com.nightowleyes.owlnetguard.ui.theme.TextMuted
 import com.nightowleyes.owlnetguard.ui.theme.TextSecondary
 
@@ -55,12 +56,13 @@ fun SelectedAppsHeaderBar(
             Text(
                 text = "◆ Ứng dụng đã chọn ($selectedCount)",
                 color = CyberCyan,
-                fontSize = 13.5.sp,
-                fontWeight = FontWeight.ExtraBold
+                fontFamily = JosefinSans,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold
             )
             if (selectedCount > 0) {
                 Text(
-                    text = "Đang cách ly: $activeCount • Vuốt ngang để xóa",
+                    text = "Vuốt ngang để bỏ",
                     color = TextMuted,
                     fontSize = 10.5.sp,
                     maxLines = 1,
@@ -119,8 +121,8 @@ fun EmptySelectedAppsView(
         )
         Spacer(modifier = Modifier.height(12.dp))
         Text(
-            text = "Chưa có ứng dụng nào trong danh sách đã chọn.\nNhấn \"Chọn ứng dụng ngay\" để mở bảng tất cả ứng dụng và thêm vào danh sách!",
-            fontSize = 13.sp,
+            text = "Chưa có ứng dụng nào.\nNhấn bên dưới để thêm vào danh sách.",
+            fontSize = 12.5.sp,
             color = TextSecondary,
             textAlign = TextAlign.Center,
             lineHeight = 18.sp

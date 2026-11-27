@@ -204,7 +204,7 @@ fun OpenSourceLicensesDialog(
                         "• AndroidX Core KTX & Activity Compose - Apache-2.0\n" +
                         "• AndroidX Lifecycle Runtime - Apache-2.0\n" +
                         "• Kotlin Standard Library & Kotlinx Coroutines - Apache-2.0\n" +
-                        "• Josefin Sans Font - SIL Open Font License (OFL 1.1)\n\n" +
+                        "• Josefin Sans & Alata Fonts - SIL Open Font License (OFL 1.1)\n\n" +
                         "Bản quyền dự án © NightOwlEyes. Phát hành theo giấy phép GNU General Public License v3.0 (GPL-3.0).",
                     fontSize = 12.sp,
                     color = TextSecondary
@@ -285,6 +285,92 @@ fun cleanReleaseNotes(rawBody: String): String {
     } else {
         ""
     }
+}
+
+data class AvailableUpdateInfo(
+    val version: String,
+    val htmlUrl: String,
+    val releaseNotes: String
+)
+
+/**
+ * Kiểm tra cập nhật ngầm trên GitHub khi mở ứng dụng.
+ * Chỉ trả về AvailableUpdateInfo nếu có phiên bản mới hơn CURRENT_APP_VERSION.
+ */
+suspend fun fetchAvailableUpdate(): AvailableUpdateInfo? = withContext(Dispatchers.IO) {
+    try {
+        val url = URL(MainActivity.GITHUB_LATEST_API)
+        val conn = (url.openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            setRequestProperty("Accept", "application/vnd.github+json")
+            connectTimeout = 5000
+            readTimeout = 5000
+        }
+        if (conn.responseCode == 200) {
+            val body = conn.inputStream.bufferedReader().use { it.readText() }
+            val json = JSONObject(body)
+            val tagName = json.optString("tag_name", "").removePrefix("v").removePrefix("V")
+            if (tagName.isNotBlank() && compareVersions(tagName, MainActivity.CURRENT_APP_VERSION) > 0) {
+                val htmlUrl = json.optString("html_url", MainActivity.GITHUB_RELEASES_URL)
+                val notes = cleanReleaseNotes(json.optString("body", ""))
+                AvailableUpdateInfo(version = tagName, htmlUrl = htmlUrl, releaseNotes = notes)
+            } else {
+                null
+            }
+        } else {
+            null
+        }
+    } catch (_: Exception) {
+        null
+    }
+}
+
+@Composable
+fun DisruptInfoDialog(
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = FacetedCardShape,
+        modifier = Modifier.border(1.dp, SlateBorder, FacetedCardShape),
+        containerColor = SlateSurfaceElevated,
+        titleContentColor = TextPrimary,
+        textContentColor = TextSecondary,
+        title = {
+            Text(
+                text = "⚡ Làm gián đoạn mạng",
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 17.sp,
+                color = CyberCyanLight
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Chủ động đưa ứng dụng ra khỏi đường hầm VPN trong chốc lát rồi đưa lại vào đường hầm để kích thích báo mất kết nối ngay mà không cần bật/tắt Wi-Fi hay Dữ liệu di động.",
+                    fontSize = 12.5.sp,
+                    color = TextPrimary,
+                    lineHeight = 18.sp
+                )
+                HorizontalDivider(color = SlateBorder)
+                Text(
+                    text = "• Một số ứng dụng/game lắng nghe thay đổi giao diện mạng sẽ lập tức phát hiện và tự ngắt kết nối ngay.\n" +
+                        "• Một số ứng dụng tự động giữ kết nối ngầm hoặc chỉ chờ hết hạn gói tin (timeout) có thể sẽ không phát hiện ngay sự gián đoạn này.",
+                    fontSize = 12.sp,
+                    color = TextSecondary,
+                    lineHeight = 17.sp
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Đã hiểu", color = CyberCyan, fontWeight = FontWeight.Bold)
+            }
+        }
+    )
 }
 
 @Composable

@@ -37,6 +37,7 @@ import com.nightowleyes.owlnetguard.ui.theme.BrandPrimaryLight
 import com.nightowleyes.owlnetguard.ui.theme.CyberCyan
 import com.nightowleyes.owlnetguard.ui.theme.DangerRed
 import com.nightowleyes.owlnetguard.ui.theme.FacetedBadgeShape
+import com.nightowleyes.owlnetguard.ui.theme.JosefinSans
 import com.nightowleyes.owlnetguard.ui.theme.SlateBorder
 import com.nightowleyes.owlnetguard.ui.theme.SlateSurfaceElevated
 import com.nightowleyes.owlnetguard.ui.theme.TextMuted
@@ -72,6 +73,7 @@ fun HeaderSection(
                 Text(
                     text = "OWL ",
                     color = TextPrimary,
+                    fontFamily = JosefinSans,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = 0.8.sp
@@ -79,6 +81,7 @@ fun HeaderSection(
                 Text(
                     text = "NETGUARD",
                     color = BrandPrimaryLight,
+                    fontFamily = JosefinSans,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = 0.8.sp
